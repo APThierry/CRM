@@ -1,0 +1,360 @@
+// =============================================================================
+// Modelo de dados do CRM
+// -----------------------------------------------------------------------------
+// Cada "model" abaixo vira uma tabela no banco PostgreSQL.
+// Documentação explicando cada tabela: docs/ARQUITETURA.md
+//
+// MULTIEMPRESA: quase toda tabela tem `organizacaoId`. Assim o mesmo sistema
+// atende a empresa de bombeiros hoje e outros negócios amanhã, cada um vendo
+// só os próprios dados.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// -----------------------------------------------------------------------------
+// Organização = a empresa que USA o CRM (ex.: a empresa de bombeiros).
+// -----------------------------------------------------------------------------
+model Organizacao {
+  id        String   @id @default(cuid())
+  nome      String
+  slug      String   @unique // identificador curto, ex.: "bombeiros-sp"
+  documento String? // CNPJ
+  telefone  String?
+  email     String?
+  criadoEm  DateTime @default(now())
+
+  usuarios      Usuario[]
+  clientes      Cliente[]
+  contatos      Contato[]
+  etapas        EtapaFunil[]
+  negocios      Negocio[]
+  servicos      Servico[]
+  turmas        Turma[]
+  participantes Participante[]
+  atividades    Atividade[]
+  mensagens     MensagemWhatsapp[]
+  whatsapp      ConfiguracaoWhatsapp?
+}
+
+enum Papel {
+  ADMIN // configura tudo
+  GESTOR // vê todos os clientes e relatórios
+  VENDEDOR // vê os próprios clientes e negócios
+  INSTRUTOR // vê turmas e participantes
+}
+
+model Usuario {
+  id            String   @id @default(cuid())
+  organizacaoId String
+  nome          String
+  email         String   @unique
+  senhaHash     String
+  papel         Papel    @default(VENDEDOR)
+  ativo         Boolean  @default(true)
+  criadoEm      DateTime @default(now())
+
+  organizacao         Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  clientes            Cliente[]
+  negocios            Negocio[]
+  atividades          Atividade[]
+  turmasComoInstrutor Turma[]
+
+  @@index([organizacaoId])
+}
+
+// -----------------------------------------------------------------------------
+// Cliente = quem COMPRA (empresa que contrata o curso de brigada, condomínio,
+// escola, indústria... ou uma pessoa física).
+// -----------------------------------------------------------------------------
+enum TipoCliente {
+  PJ
+  PF
+}
+
+model Cliente {
+  id            String      @id @default(cuid())
+  organizacaoId String
+  tipo          TipoCliente @default(PJ)
+  nome          String // razão social ou nome da pessoa
+  nomeFantasia  String?
+  documento     String? // CNPJ ou CPF
+  telefone      String?
+  whatsapp      String? // formato internacional: 5511999998888
+  email         String?
+  cidade        String?
+  uf            String?
+  segmento      String? // ex.: indústria, condomínio, escola, hospital
+  origem        String? // ex.: indicação, Google, Instagram
+  observacoes   String?
+  responsavelId String?
+  criadoEm      DateTime    @default(now())
+  atualizadoEm  DateTime    @updatedAt
+
+  organizacao   Organizacao        @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  responsavel   Usuario?           @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
+  contatos      Contato[]
+  negocios      Negocio[]
+  turmas        Turma[]
+  participantes Participante[]
+  atividades    Atividade[]
+  mensagens     MensagemWhatsapp[]
+
+  @@index([organizacaoId])
+  @@index([organizacaoId, nome])
+}
+
+// Pessoa de contato dentro de um cliente (ex.: técnico de segurança, síndico).
+model Contato {
+  id            String   @id @default(cuid())
+  organizacaoId String
+  clienteId     String
+  nome          String
+  cargo         String?
+  telefone      String?
+  whatsapp      String?
+  email         String?
+  principal     Boolean  @default(false)
+  criadoEm      DateTime @default(now())
+
+  organizacao Organizacao        @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  cliente     Cliente            @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  negocios    Negocio[]
+  mensagens   MensagemWhatsapp[]
+
+  @@index([organizacaoId])
+  @@index([clienteId])
+}
+
+// -----------------------------------------------------------------------------
+// Funil de vendas. As etapas são configuráveis por organização, então cada
+// negócio pode ter o próprio processo de venda.
+// -----------------------------------------------------------------------------
+enum TipoEtapa {
+  ABERTA
+  GANHO
+  PERDIDO
+}
+
+model EtapaFunil {
+  id            String    @id @default(cuid())
+  organizacaoId String
+  nome          String
+  ordem         Int
+  cor           String    @default("#64748b")
+  tipo          TipoEtapa @default(ABERTA)
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  negocios    Negocio[]
+
+  @@index([organizacaoId, ordem])
+}
+
+// Negócio = uma oportunidade de venda (ex.: "Brigada básica para 30
+// funcionários da Metalúrgica X").
+model Negocio {
+  id                 String    @id @default(cuid())
+  organizacaoId      String
+  titulo             String
+  clienteId          String
+  contatoId          String?
+  etapaId            String
+  servicoId          String?
+  responsavelId      String?
+  valor              Decimal   @default(0) @db.Decimal(12, 2)
+  quantidadeAlunos   Int?
+  previsaoFechamento DateTime?
+  fechadoEm          DateTime?
+  motivoPerda        String?
+  criadoEm           DateTime  @default(now())
+  atualizadoEm       DateTime  @updatedAt
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  cliente     Cliente     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  contato     Contato?    @relation(fields: [contatoId], references: [id], onDelete: SetNull)
+  etapa       EtapaFunil  @relation(fields: [etapaId], references: [id])
+  servico     Servico?    @relation(fields: [servicoId], references: [id], onDelete: SetNull)
+  responsavel Usuario?    @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
+  atividades  Atividade[]
+
+  @@index([organizacaoId, etapaId])
+}
+
+// -----------------------------------------------------------------------------
+// Serviço = o que a organização vende. Para os bombeiros são os cursos:
+// Brigada Básica, Intermediária, Avançada, Primeiros Socorros, NR-23...
+// `validadeMeses` permite avisar quando o certificado vai vencer (reciclagem).
+// -----------------------------------------------------------------------------
+model Servico {
+  id            String   @id @default(cuid())
+  organizacaoId String
+  nome          String
+  descricao     String?
+  cargaHoraria  Int? // em horas
+  validadeMeses Int? // ex.: 12 = reciclagem anual
+  preco         Decimal? @db.Decimal(12, 2) // preço por aluno ou por turma
+  ativo         Boolean  @default(true)
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  negocios    Negocio[]
+  turmas      Turma[]
+
+  @@index([organizacaoId])
+}
+
+// -----------------------------------------------------------------------------
+// Turma = uma edição do curso com data, local e instrutor.
+// Pode ser "in company" (ligada a um cliente) ou aberta.
+// -----------------------------------------------------------------------------
+enum StatusTurma {
+  PLANEJADA
+  CONFIRMADA
+  REALIZADA
+  CANCELADA
+}
+
+model Turma {
+  id            String      @id @default(cuid())
+  organizacaoId String
+  servicoId     String
+  clienteId     String? // preenchido quando é treinamento in company
+  instrutorId   String?
+  dataInicio    DateTime
+  dataFim       DateTime?
+  local         String?
+  vagas         Int?
+  status        StatusTurma @default(PLANEJADA)
+  observacoes   String?
+  criadoEm      DateTime    @default(now())
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  servico     Servico     @relation(fields: [servicoId], references: [id])
+  cliente     Cliente?    @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  instrutor   Usuario?    @relation(fields: [instrutorId], references: [id], onDelete: SetNull)
+  matriculas  Matricula[]
+
+  @@index([organizacaoId, dataInicio])
+}
+
+// Participante = o aluno (funcionário do cliente que faz o curso).
+model Participante {
+  id            String   @id @default(cuid())
+  organizacaoId String
+  clienteId     String?
+  nome          String
+  cpf           String?
+  telefone      String?
+  email         String?
+  criadoEm      DateTime @default(now())
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  cliente     Cliente?    @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  matriculas  Matricula[]
+
+  @@index([organizacaoId])
+  @@index([clienteId])
+}
+
+// Matrícula = participante numa turma. Guarda o resultado e a validade do
+// certificado, que é a base dos lembretes de reciclagem.
+model Matricula {
+  id                String    @id @default(cuid())
+  turmaId           String
+  participanteId    String
+  presente          Boolean?
+  aprovado          Boolean?
+  certificadoNumero String?
+  validadeAte       DateTime?
+
+  turma        Turma        @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  participante Participante @relation(fields: [participanteId], references: [id], onDelete: Cascade)
+
+  @@unique([turmaId, participanteId])
+  @@index([validadeAte])
+}
+
+// -----------------------------------------------------------------------------
+// Atividades: histórico (notas, ligações, reuniões) e tarefas com data.
+// -----------------------------------------------------------------------------
+enum TipoAtividade {
+  NOTA
+  LIGACAO
+  WHATSAPP
+  EMAIL
+  REUNIAO
+  VISITA
+  TAREFA
+}
+
+model Atividade {
+  id            String        @id @default(cuid())
+  organizacaoId String
+  tipo          TipoAtividade
+  descricao     String
+  clienteId     String?
+  negocioId     String?
+  usuarioId     String?
+  agendadaPara  DateTime? // para tarefas e lembretes
+  concluida     Boolean       @default(false)
+  criadoEm      DateTime      @default(now())
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  cliente     Cliente?    @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  negocio     Negocio?    @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  usuario     Usuario?    @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([organizacaoId, agendadaPara])
+  @@index([clienteId])
+}
+
+// -----------------------------------------------------------------------------
+// WhatsApp. O CRM conversa com um "provedor" (Evolution API ou API oficial da
+// Meta). Detalhes: docs/WHATSAPP.md
+// -----------------------------------------------------------------------------
+enum ProvedorWhatsapp {
+  EVOLUTION // não oficial, roda na própria VPS
+  META_CLOUD // API oficial do WhatsApp Business
+}
+
+model ConfiguracaoWhatsapp {
+  id            String           @id @default(cuid())
+  organizacaoId String           @unique
+  provedor      ProvedorWhatsapp @default(EVOLUTION)
+  instancia     String? // nome da instância (Evolution) ou phone number id (Meta)
+  apiUrl        String?
+  apiToken      String? // TODO: guardar criptografado
+  ativo         Boolean          @default(false)
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+}
+
+enum DirecaoMensagem {
+  ENTRADA
+  SAIDA
+}
+
+model MensagemWhatsapp {
+  id            String          @id @default(cuid())
+  organizacaoId String
+  clienteId     String?
+  contatoId     String?
+  telefone      String
+  direcao       DirecaoMensagem
+  conteudo      String
+  status        String? // enviada, entregue, lida, erro
+  idExterno     String? // id da mensagem no provedor
+  criadoEm      DateTime        @default(now())
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  cliente     Cliente?    @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  contato     Contato?    @relation(fields: [contatoId], references: [id], onDelete: SetNull)
+
+  @@index([organizacaoId, telefone])
+  @@index([clienteId])
+}
