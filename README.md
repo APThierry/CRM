@@ -1,13 +1,13 @@
 # CRM
 
-CRM web para empresas de treinamento, começando por uma **empresa de bombeiros que vende cursos de brigadista**, com integração com **WhatsApp**.
+CRM web para empresas de treinamento, começando pela **[Brigada MG](https://brigadamg.com.br)**, empresa de treinamentos em segurança e cursos de brigadista, com integração com **WhatsApp**.
 Ele foi pensado desde o início para atender **várias empresas (multiempresa)**. Cada organização vê só os próprios dados e configura o próprio funil.
 
 ## O que o sistema faz (planejado)
 
 - **Clientes e contatos**: empresas, condomínios, escolas, indústrias e os contatos de cada uma (técnico de segurança, síndico, RH).
 - **Funil de vendas**: quadro Kanban com etapas configuráveis.
-- **Cursos (serviços)**: Brigada Básica, Intermediária, Avançada, Primeiros Socorros, com carga horária e validade.
+- **Cursos (serviços)**: Bombeiro Civil, NR 23/IT 12 (brigada), NR 33, NR 35, NR 10, Lei Lucas, NR 7, NR 5 (CIPA) e Brigada Florestal, com carga horária, validade e modalidade (presencial, EAD ou híbrido).
 - **Turmas**: data, local, instrutor e vagas, in company ou abertas.
 - **Participantes e certificados**: presença, aprovação, número e validade do certificado.
 - **Reciclagem**: avisa quando os certificados de um cliente estão para vencer. É a venda recorrente do negócio.
@@ -22,7 +22,7 @@ Ele foi pensado desde o início para atender **várias empresas (multiempresa)**
 | Visual | Tailwind CSS 4 | Estilizar as telas |
 | Banco de dados | PostgreSQL | Guardar os dados |
 | Acesso ao banco | Prisma 7 | Escrever consultas em TypeScript em vez de SQL puro |
-| WhatsApp | Evolution API ou API oficial da Meta | Enviar e receber mensagens |
+| WhatsApp | Evolution API (usa o Baileys por dentro) | Enviar e receber mensagens |
 | Produção | VPS Linux + Docker | Hospedar o sistema |
 
 ## Documentação
@@ -38,7 +38,19 @@ Ele foi pensado desde o início para atender **várias empresas (multiempresa)**
 
 ```bash
 npm install
-npx prisma dev --name crm --detach   # sobe o PostgreSQL local
-npx prisma migrate dev               # cria as tabelas
-npm run dev                          # abre em http://localhost:3000
+cp .env.example .env
+npm run db:local      # terminal 1: sobe o PostgreSQL local (deixe aberto)
+npm run db:migrate    # terminal 2: cria as tabelas
+npm run db:seed       # dados de exemplo da Brigada MG
+npm run dev           # abre em http://localhost:3000
 ```
+
+## Telas prontas
+
+| Tela | Endereço | O que faz |
+|---|---|---|
+| Painel | `/` | Valor no funil, vendas do mês, reciclagens a oferecer, tarefas, próximas turmas |
+| Clientes | `/clientes` | Lista com busca, cadastro e ficha (contatos, negócios, certificados, histórico e tarefas, botão do WhatsApp) |
+| Funil de vendas | `/funil` | Kanban de arrastar e soltar, criação de negócios |
+| Turmas | `/turmas` | Agenda de treinamentos (somente leitura por enquanto) |
+| Cursos | `/cursos` | Os 9 cursos da Brigada MG (somente leitura por enquanto) |

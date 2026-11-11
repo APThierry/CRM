@@ -219,6 +219,12 @@ enum StatusTurma {
   CANCELADA
 }
 
+enum Modalidade {
+  PRESENCIAL
+  EAD
+  HIBRIDO
+}
+
 model Turma {
   id            String      @id @default(cuid())
   organizacaoId String
@@ -229,6 +235,7 @@ model Turma {
   dataFim       DateTime?
   local         String?
   vagas         Int?
+  modalidade    Modalidade  @default(PRESENCIAL)
   status        StatusTurma @default(PLANEJADA)
   observacoes   String?
   criadoEm      DateTime    @default(now())

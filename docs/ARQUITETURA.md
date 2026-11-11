@@ -59,8 +59,27 @@ Com isso o CRM consegue listar, por exemplo, "clientes com certificados vencendo
 prisma/
   schema.prisma        modelo de dados
   migrations/          histórico de mudanças do banco
+  seed.ts              dados de exemplo (npm run db:seed)
+scripts/
+  banco-local.mjs      PostgreSQL local para desenvolvimento (npm run db:local)
 src/
   app/                 páginas e rotas (cada pasta vira uma URL)
+    page.tsx           painel (/)
+    clientes/          lista, novo, ficha [id] e actions.ts (gravações)
+    funil/             Kanban (kanban.tsx roda no navegador) e actions.ts
+    cursos/  turmas/   listas
+  components/          peças visuais reutilizadas (menu, cabeçalho, etiquetas)
+  lib/
+    db.ts              conexão com o banco
+    org.ts             organização atual (vira "usuário logado" na Fase 2)
+    formatar.ts        moeda, datas, telefone e link do WhatsApp
   generated/prisma/    código gerado pelo Prisma (não editar, não vai para o Git)
 docs/                  esta documentação
 ```
+
+## Padrões usados no código
+
+- **Server Components** (padrão): as páginas buscam dados direto do banco no servidor. Nada de API intermediária.
+- **`<Suspense>` + `connection()`**: o projeto usa *Cache Components* do Next.js 16. Toda parte que lê o banco fica dentro de `<Suspense>` e chama `await connection()`, para buscar dados novos a cada acesso.
+- **Server Actions** (`actions.ts`): gravações chamadas pelos formulários. Toda action confere se o registro pertence à organização atual.
+- **Client Components** (`"use client"`): só onde precisa de interação no navegador, como o Kanban e o menu.

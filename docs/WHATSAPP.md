@@ -1,26 +1,45 @@
 # Integração com WhatsApp
 
-O CRM vai falar com o WhatsApp por meio de um **provedor**. O código terá uma camada única (`enviarMensagem`, `receberWebhook`), então dá para trocar de provedor sem reescrever o sistema.
+## Decisão: Evolution API (que usa o Baileys por dentro)
 
-## As duas opções
+O **Baileys** é uma biblioteca em Node.js que conecta um número de WhatsApp comum pelo protocolo do WhatsApp Web, lendo um QR Code.
+A **Evolution API** é um servidor pronto que usa o Baileys por dentro e oferece por cima:
 
-| | Evolution API (não oficial) | API oficial da Meta (Cloud API) |
+| | Baileys direto no CRM | Evolution API (escolhida) |
 |---|---|---|
-| Como funciona | Conecta um número comum lendo um QR Code, como o WhatsApp Web | Número registrado no WhatsApp Business Platform |
-| Onde roda | Na sua VPS (Docker) | Nos servidores da Meta |
-| Custo | Grátis (só a VPS) | Cobrança por mensagem iniciada pela empresa (templates) |
-| Burocracia | Nenhuma | Conta Meta Business verificada e templates aprovados |
-| Risco | O número **pode ser banido**, principalmente com envios em massa | Estável e permitido |
-| Bom para | Começar rápido, testar, poucos envios | Produção e lembretes em escala |
+| O que é | Biblioteca que precisa ficar conectada o tempo todo | Servidor separado, em Docker |
+| Conexão | Teríamos que manter um processo Node sempre ligado, à parte do Next.js | Já faz isso |
+| Integração com o CRM | Código próprio para tudo | API REST para enviar e webhook para receber |
+| Vários números (multiempresa) | Teríamos que programar | Uma **instância** por organização |
+| Reconexão, QR Code, mídia | Teríamos que programar | Já vem pronto, com painel |
+| Trocar pela API oficial depois | Difícil | Fácil, por causa da camada única do CRM |
 
-## Recomendação
+Escolhemos a Evolution API porque ela entrega o Baileys pronto para produção e encaixa no modelo multiempresa: cada cliente do CRM conecta o próprio número na própria instância.
 
-1. **Desenvolvimento e começo:** Evolution API na VPS com um número de testes, para ver tudo funcionando rápido.
-2. **Produção com muitos clientes:** migrar para a API oficial, principalmente para os lembretes de reciclagem em massa.
+## Riscos (valem para Baileys e Evolution)
 
-## Como o fluxo funciona
+- **Não é oficial.** O WhatsApp pode **banir o número**, principalmente se ele mandar muitas mensagens para quem não tem o contato salvo ou não respondeu antes.
+- Boas práticas:
+  - use um número dedicado à empresa, não o pessoal;
+  - "aqueça" o número aos poucos;
+  - evite disparos em massa;
+  - mantenha intervalos entre envios nos lembretes de reciclagem;
+  - deixe sempre a opção de o cliente pedir para não receber mais mensagens.
+- Se o volume crescer, migre para a API oficial da Meta (Cloud API). O CRM já tem o campo `provedor` em `ConfiguracaoWhatsapp` para isso.
 
-- **Enviar:** o CRM chama a API do provedor com o número e o texto, e salva em `MensagemWhatsapp` com `direcao = SAIDA`.
-- **Receber:** o provedor chama uma URL do CRM (*webhook*, por exemplo `/api/whatsapp/webhook`) a cada mensagem nova. O CRM procura o cliente pelo telefone e salva com `direcao = ENTRADA`.
+## Como vai funcionar
 
-> Status: ainda não implementado. Veja [ROADMAP.md](ROADMAP.md).
+```
+CRM ──POST /message/sendText/{instancia}──► Evolution API ──► WhatsApp
+CRM ◄──POST /api/whatsapp/webhook────────── Evolution API ◄── WhatsApp
+```
+
+- **Enviar:** o CRM chama a Evolution API e salva a mensagem em `MensagemWhatsapp` com `direcao = SAIDA`.
+- **Receber:** a Evolution API chama o webhook do CRM a cada mensagem nova. O CRM procura o cliente pelo telefone e salva com `direcao = ENTRADA`.
+- **Conectar o número:** na tela de configurações o CRM mostra o QR Code da instância, e você lê pelo celular.
+
+## Por enquanto
+
+Enquanto a integração não fica pronta, a ficha do cliente tem um botão **"Abrir no WhatsApp"** (link `wa.me`), que abre a conversa no WhatsApp Web ou no celular.
+
+> Status: Fase 3 do [ROADMAP.md](ROADMAP.md).
