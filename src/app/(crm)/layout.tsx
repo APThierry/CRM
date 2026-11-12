@@ -1,11 +1,12 @@
-// Layout das páginas internas (exigem login): menu lateral + conteúdo.
+// Layout das páginas internas (exigem login): menu (lateral no computador,
+// barra no topo no celular) + conteúdo.
 import { Suspense } from "react";
 import { MenuLateral } from "@/components/menu-lateral";
 import { UsuarioNoMenu } from "@/components/usuario-no-menu";
 
 export default function LayoutCrm({ children }: LayoutProps<"/">) {
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col md:flex-row">
       <MenuLateral
         usuario={
           <Suspense fallback={<div className="h-14" />}>

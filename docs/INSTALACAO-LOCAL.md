@@ -34,7 +34,9 @@ Abra **um terminal só para o banco** e deixe-o aberto:
 npm run db:local
 ```
 
-Ele sobe um PostgreSQL 17 na porta **5433** e guarda os dados na pasta `.banco-local/`. Para parar, use Ctrl+C.
+Ele sobe um PostgreSQL 17 na porta **5433** e guarda os dados na pasta `../crm-banco-local/`, ao lado do projeto (por exemplo, `D:\crm-banco-local`). Para parar, use Ctrl+C.
+
+> **Por que fora do projeto?** O Postgres grava arquivos o tempo todo. Se a pasta ficar dentro do projeto, o `npm run dev` acha que o código mudou e a página fica recarregando sem parar. Para usar outra pasta, defina `BANCO_LOCAL_DIR` antes de rodar o comando.
 
 ## 5. Criar as tabelas e os dados de exemplo
 
@@ -74,6 +76,8 @@ Depois abra http://localhost:3000.
 | Erro de tipo dizendo que um campo não existe | Faltou `npx prisma generate` depois de mudar o schema. |
 | `character with byte sequence ... has no equivalent in encoding "WIN1252"` | O banco foi criado sem UTF-8 (instalações antigas). Veja "Converter o banco para UTF-8" abaixo. |
 | `Cannot find name 'PageProps'` | Rode `npx next typegen` ou `npm run dev` uma vez. |
+| A página fica recarregando sozinha (`npm run dev`) | Algum programa grava arquivos dentro da pasta do projeto. O mais comum é o banco em `.banco-local/` (instalações antigas): pare o banco, mova a pasta para `../crm-banco-local` e rode `npm run db:local` de novo. |
+| `Encontrei dados antigos em .banco-local/` | Mesma coisa: mova a pasta para `../crm-banco-local`. |
 
 ## Converter o banco para UTF-8
 

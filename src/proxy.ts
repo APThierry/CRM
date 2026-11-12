@@ -18,6 +18,8 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   // Não roda para a API (o webhook do WhatsApp tem a própria proteção),
-  // nem para arquivos estáticos.
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|svg|ico)$).*)"],
+  // nem para os caminhos internos do Next (_next/*, __nextjs_*), nem para
+  // arquivos estáticos. Atenção: barrar "_next/webpack-hmr" faz a página de
+  // login recarregar sem parar em modo desenvolvimento.
+  matcher: ["/((?!api|_next|__nextjs|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|ico|webp|woff2?)$).*)"],
 };

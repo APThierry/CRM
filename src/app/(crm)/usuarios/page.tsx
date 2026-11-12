@@ -59,7 +59,9 @@ async function Lista() {
                     <div className="text-xs text-slate-500">{u.email}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <form action={alterarPapel.bind(null, u.id)} className="flex gap-1">
+                    {/* key com o papel: depois de salvar, o React monta o select de novo
+                        com o papel novo (um <select defaultValue> não se atualiza sozinho). */}
+                    <form key={u.papel} action={alterarPapel.bind(null, u.id)} className="flex gap-1">
                       <select name="papel" defaultValue={u.papel} className="campo w-auto py-1 text-xs" aria-label={`Papel de ${u.nome}`}>
                         {Object.entries(nomesPapel).map(([v, r]) => <option key={v} value={v}>{r}</option>)}
                       </select>

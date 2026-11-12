@@ -1,12 +1,19 @@
 // Sobe um PostgreSQL 17 de verdade no seu PC, sem Docker e sem instalar nada.
 // Uso: npm run db:local   (deixe o terminal aberto; Ctrl+C para parar)
 //
-// Os dados ficam na pasta .banco-local/ (fora do Git).
+// Os dados ficam FORA da pasta do projeto (padrão: ../crm-banco-local, ou a
+// pasta em BANCO_LOCAL_DIR). Dentro do projeto, o Postgres grava arquivos o
+// tempo todo e o "next dev" acha que o código mudou: a página fica
+// recarregando sem parar.
 import EmbeddedPostgres from "embedded-postgres";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-const pasta = resolve(".banco-local");
+const pasta = resolve(process.env.BANCO_LOCAL_DIR ?? "../crm-banco-local");
+if (existsSync(resolve(".banco-local")) && !existsSync(pasta)) {
+  console.error(`Encontrei dados antigos em .banco-local/. Pare o banco e mova a pasta para ${pasta}.`);
+  process.exit(1);
+}
 const porta = 5433; // 5433 para não brigar com um PostgreSQL instalado na 5432
 
 const pg = new EmbeddedPostgres({

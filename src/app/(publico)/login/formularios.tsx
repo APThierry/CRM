@@ -9,7 +9,7 @@ export function FormularioLogin() {
     <form action={acao} className="space-y-4">
       <div>
         <label className="rotulo" htmlFor="email">E-mail</label>
-        <input id="email" name="email" type="email" autoComplete="username" required autoFocus className="campo" />
+        <input id="email" name="email" type="email" autoComplete="username" required autoFocus defaultValue={estado?.valores?.email} key={estado?.valores?.email} className="campo" />
       </div>
       <div>
         <label className="rotulo" htmlFor="senha">Senha</label>
@@ -27,11 +27,11 @@ export function FormularioPrimeiroAcesso() {
     <form action={acao} className="space-y-4">
       <div>
         <label className="rotulo" htmlFor="nome">Seu nome</label>
-        <input id="nome" name="nome" required autoFocus className="campo" />
+        <input id="nome" name="nome" required autoFocus defaultValue={estado?.valores?.nome} key={`n-${estado?.valores?.nome}`} className="campo" />
       </div>
       <div>
         <label className="rotulo" htmlFor="email">E-mail</label>
-        <input id="email" name="email" type="email" autoComplete="username" required className="campo" />
+        <input id="email" name="email" type="email" autoComplete="username" required defaultValue={estado?.valores?.email} key={`e-${estado?.valores?.email}`} className="campo" />
       </div>
       <div>
         <label className="rotulo" htmlFor="senha">Senha (mínimo 8 caracteres)</label>
