@@ -16,7 +16,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="pt-BR" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full font-sans">
         <MenuLateral />
-        <main className="min-w-0 flex-1 px-4 py-6 md:px-8">{children}</main>
+        <main className="min-w-0 flex-1 px-4 py-6 md:px-8 print:p-0">{children}</main>
       </body>
     </html>
   );

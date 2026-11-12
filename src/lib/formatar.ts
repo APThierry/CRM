@@ -12,6 +12,19 @@ export const moeda = (v: number | { toString(): string } | null | undefined) =>
   moedaBR.format(Number(v ?? 0));
 
 export const data = (d: Date | null | undefined) => (d ? dataBR.format(d) : "—");
+
+/** Data no formato do <input type="date"> (aaaa-mm-dd), no fuso de Brasília. */
+const dataISO = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" });
+export const paraInputData = (d: Date | null | undefined) => (d ? dataISO.format(d) : "");
+
+/** "2026-11-20" (do formulário) -> Date às 08:00 de Brasília. */
+export const deInputData = (v: string | null | undefined) => (v ? new Date(`${v}T08:00:00-03:00`) : null);
+
+/** 12345678901 -> 123.456.789-01 */
+export function cpf(v: string | null | undefined) {
+  const d = (v ?? "").replace(/\D/g, "");
+  return d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : v ?? "";
+}
 export const dataHora = (d: Date | null | undefined) => (d ? dataHoraBR.format(d) : "—");
 
 /** Mantém só os dígitos e garante o código do Brasil (55). */

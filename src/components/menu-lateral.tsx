@@ -14,12 +14,13 @@ const itens = [
   { href: "/clientes", rotulo: "Clientes", icone: "◉" },
   { href: "/funil", rotulo: "Funil de vendas", icone: "▤" },
   { href: "/turmas", rotulo: "Turmas", icone: "◷" },
+  { href: "/certificados", rotulo: "Certificados", icone: "✎" },
   { href: "/cursos", rotulo: "Cursos", icone: "✚" },
 ] as const;
 
 export function MenuLateral() {
   return (
-    <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col bg-marca-900 text-marca-50 md:flex">
+    <aside className="sticky top-0 hidden h-screen print:hidden! w-56 shrink-0 flex-col bg-marca-900 text-marca-50 md:flex">
       <div className="px-5 py-5">
         <div className="text-lg font-bold tracking-tight">Brigada MG</div>
         <div className="text-xs text-marca-100/70">CRM</div>

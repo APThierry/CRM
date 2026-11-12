@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Skills e configurações do Claude Code (não fazem parte do sistema)
+    ".claude/**",
+    // Código gerado pelo Prisma
+    "src/generated/**",
   ]),
 ]);
 

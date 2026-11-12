@@ -94,7 +94,10 @@ async function ConteudoPainel() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="cartao p-4">
-          <h2 className="mb-3 font-semibold">🔁 Reciclagens a oferecer</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-semibold">🔁 Reciclagens a oferecer</h2>
+            <Link href="/certificados?situacao=vencendo" className="text-xs text-marca-700 hover:underline">ver certificados</Link>
+          </div>
           {reciclagens.size === 0 ? (
             <Vazio>Nenhum certificado vencendo nos próximos 60 dias.</Vazio>
           ) : (
@@ -149,7 +152,7 @@ async function ConteudoPainel() {
               {proximasTurmas.map((t) => (
                 <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
                   <div>
-                    <div className="font-medium">{t.servico.nome}</div>
+                    <Link href={`/turmas/${t.id}`} className="font-medium hover:underline">{t.servico.nome}</Link>
                     <div className="text-xs text-slate-500">{t.local}</div>
                   </div>
                   <div className="text-right text-xs text-slate-500">

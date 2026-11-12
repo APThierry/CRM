@@ -197,7 +197,9 @@ async function main() {
     },
   });
   const validade = diasAPartirDeHoje(-329 + 365);
-  for (const nome of ["João Pereira", "Maria Oliveira", "Pedro Santos", "Luana Rocha"]) {
+  // Mesmo formato gerado pelo sistema: prefixo da organização, ano e sequência.
+  const anoTurma = turmaAntiga.dataFim!.getFullYear();
+  for (const [i, nome] of ["João Pereira", "Maria Oliveira", "Pedro Santos", "Luana Rocha"].entries()) {
     const p = await db.participante.create({
       data: { organizacaoId, nome, clienteId: cliente("Supermercado").id },
     });
@@ -207,7 +209,8 @@ async function main() {
         participanteId: p.id,
         presente: true,
         aprovado: true,
-        certificadoNumero: `BMG-${p.id.slice(-6).toUpperCase()}`,
+        certificadoNumero: `BM-${anoTurma}-${String(i + 1).padStart(4, "0")}`,
+        emitidoEm: turmaAntiga.dataFim,
         validadeAte: validade,
       },
     });

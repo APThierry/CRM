@@ -278,6 +278,7 @@ model Matricula {
   aprovado          Boolean?
   certificadoNumero String?
   validadeAte       DateTime?
+  emitidoEm         DateTime? // data de emissão do certificado
 
   turma        Turma        @relation(fields: [turmaId], references: [id], onDelete: Cascade)
   participante Participante @relation(fields: [participanteId], references: [id], onDelete: Cascade)

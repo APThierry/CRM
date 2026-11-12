@@ -64,6 +64,7 @@ async function FichaCliente({ params }: { params: PageProps<"/clientes/[id]">["p
                 💬 Abrir no WhatsApp
               </a>
             )}
+            <Link href={`/turmas/nova?cliente=${cliente.id}`} className="botao-secundario">+ Agendar turma</Link>
             <Link href="/clientes" className="botao-secundario">Voltar</Link>
           </>
         }

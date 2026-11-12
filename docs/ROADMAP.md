@@ -17,8 +17,13 @@
 - [x] Cursos e turmas (listas)
 - [ ] Editar e excluir cliente, adicionar contatos
 - [ ] Editar negócio (valor, previsão, motivo da perda)
-- [ ] Cadastrar e editar cursos e turmas
-- [ ] Inscrever participantes na turma, registrar presença/aprovação e gerar validade do certificado
+- [x] Cadastrar e editar turmas (status, modalidade, cliente in company, instrutor, vagas)
+- [x] Inscrever alunos (reaproveita pelo CPF), presença, aprovação/reprovação
+- [x] Certificados: número sequencial, validade automática, impressão/PDF
+- [x] Tela de certificados com filtro válido/vencendo/vencido e busca
+- [ ] Cadastrar e editar cursos (preço, carga horária, validade)
+- [ ] Modelo de certificado validado pela Brigada MG (conteúdo programático, responsável técnico)
+- [ ] Importar lista de alunos por planilha
 - [ ] Menu para celular
 
 ## Fase 2: Login e usuários
@@ -34,7 +39,7 @@
 - [ ] Receber mensagens (webhook) e mostrar a conversa
 
 ## Fase 4: Reciclagem e painel
-- [ ] Lista de certificados vencendo
+- [x] Lista de certificados vencendo
 - [ ] Lembrete automático por WhatsApp
 - [ ] Painel: vendas do mês, valor no funil, conversão, turmas da semana
 

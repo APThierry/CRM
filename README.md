@@ -52,5 +52,6 @@ npm run dev           # abre em http://localhost:3000
 | Painel | `/` | Valor no funil, vendas do mês, reciclagens a oferecer, tarefas, próximas turmas |
 | Clientes | `/clientes` | Lista com busca, cadastro e ficha (contatos, negócios, certificados, histórico e tarefas, botão do WhatsApp) |
 | Funil de vendas | `/funil` | Kanban de arrastar e soltar, criação de negócios |
-| Turmas | `/turmas` | Agenda de treinamentos (somente leitura por enquanto) |
+| Turmas | `/turmas` | Agenda, cadastro e edição; na turma: inscrição de alunos, presença, aprovação e emissão de certificados |
+| Certificados | `/certificados` | Todos os certificados, filtro válido/vencendo/vencido, busca e impressão (PDF) |
 | Cursos | `/cursos` | Os 9 cursos da Brigada MG (somente leitura por enquanto) |

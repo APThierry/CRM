@@ -48,6 +48,17 @@ Para atender um negócio diferente (uma academia, uma clínica), você:
 | `ConfiguracaoWhatsapp` | Conexão de WhatsApp da organização | Instância Evolution "bombeiros" |
 | `MensagemWhatsapp` | Mensagens enviadas e recebidas | — |
 
+### Certificados
+
+Regras em `src/lib/certificados.ts`:
+
+- **Emissão:** quando o aluno é marcado como **aprovado** (individualmente ou pelo botão "Aprovar presentes e concluir turma"), o CRM grava o número, a data de emissão e a validade.
+- **Número:** prefixo da organização + ano + sequência, por exemplo `BM-2026-0001`. Ele é gerado uma única vez e nunca muda, mesmo se o aluno for reprovado e aprovado de novo.
+- **Validade:** último dia da turma (`dataFim`, ou `dataInicio` se não houver) + `Servico.validadeMeses`. Se a data da turma mudar, a validade dos aprovados é recalculada.
+- **Situação:** *vencido* (já passou), *vencendo* (vence em até 60 dias), *válido*.
+- Uma inscrição com certificado emitido não pode ser removida.
+- **Alunos repetidos:** ao inscrever, se o CPF já existir na organização, o CRM reaproveita o participante.
+
 ### Reciclagem: a funcionalidade principal
 
 `Matricula.validadeAte` é calculado como a data da turma mais `Servico.validadeMeses`.
@@ -67,12 +78,15 @@ src/
     page.tsx           painel (/)
     clientes/          lista, novo, ficha [id] e actions.ts (gravações)
     funil/             Kanban (kanban.tsx roda no navegador) e actions.ts
-    cursos/  turmas/   listas
+    turmas/            lista, nova, [id] (alunos e certificados), [id]/editar e actions.ts
+    certificados/      lista com filtros e [id] (certificado para imprimir)
+    cursos/            lista
   components/          peças visuais reutilizadas (menu, cabeçalho, etiquetas)
   lib/
     db.ts              conexão com o banco
     org.ts             organização atual (vira "usuário logado" na Fase 2)
-    formatar.ts        moeda, datas, telefone e link do WhatsApp
+    formatar.ts        moeda, datas, CPF, telefone e link do WhatsApp
+    certificados.ts    validade, numeração e situação dos certificados
   generated/prisma/    código gerado pelo Prisma (não editar, não vai para o Git)
 docs/                  esta documentação
 ```
