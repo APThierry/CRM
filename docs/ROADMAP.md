@@ -26,10 +26,16 @@
 - [ ] Importar lista de alunos por planilha
 - [ ] Menu para celular
 
-## Fase 2: Login e usuários
-- [ ] Login com e-mail e senha
-- [ ] Papéis (admin, gestor, vendedor, instrutor)
-- [ ] Filtro por organização em todas as consultas
+## Fase 2 (Fase A do plano Waseller): Login e atendentes ✅
+- [x] Login com e-mail e senha (scrypt), sessões no banco, cookie HttpOnly
+- [x] Primeiro acesso: o administrador cria a própria senha
+- [x] Bloqueio após 5 senhas erradas (15 min)
+- [x] Papéis (admin, gestor, vendedor, instrutor); tela Usuários só para admin
+- [x] Meu perfil: trocar nome e senha, ligar/desligar assinatura
+- [x] Assinatura do atendente no WhatsApp (*Nome:*) e autor de mensagens e atividades
+- [x] Filtro por organização em todas as consultas (pela organização do usuário logado)
+- [ ] Restrições finas por papel (vendedor ver só os próprios clientes, instrutor só turmas)
+- [ ] "Esqueci minha senha" por e-mail
 
 ## Fase 3: WhatsApp
 - [x] Decidir o provedor: Evolution API (usa o Baileys por dentro)
@@ -51,3 +57,10 @@
 - [ ] Deploy na VPS com HTTPS
 - [ ] Backup automático
 - [ ] Cadastro de novas organizações (atender outros negócios)
+
+## Plano "melhor que o Waseller"
+- [x] Fase A: Login e atendentes
+- [ ] Fase B: Central de atendimento (caixa de entrada única, mídia, etiquetas, respostas rápidas, atribuição)
+- [ ] Fase C: Automação (agendamento, follow-up, scripts, horário de atendimento, chatbot)
+- [ ] Fase D: Campanhas (disparos protegidos, reciclagem automática, status)
+- [ ] Fase E: Relatórios e integrações (por atendente, exportação, Google Agenda, webhooks)

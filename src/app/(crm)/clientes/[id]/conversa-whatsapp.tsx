@@ -3,9 +3,16 @@
 // A lista se atualiza sozinha a cada 10 segundos para mostrar respostas novas.
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef } from "react";
-import { enviarParaCliente } from "@/app/whatsapp/actions";
+import { enviarParaCliente } from "@/app/(crm)/whatsapp/actions";
 
-export type MensagemTela = { id: string; direcao: "ENTRADA" | "SAIDA"; conteudo: string; quando: string; status: string | null };
+export type MensagemTela = {
+  id: string;
+  direcao: "ENTRADA" | "SAIDA";
+  conteudo: string;
+  quando: string;
+  status: string | null;
+  autor: string | null; // atendente que enviou pelo CRM
+};
 
 const modelos = [
   "Olá! Tudo bem? Aqui é da Brigada MG.",
@@ -53,6 +60,7 @@ export function ConversaWhatsapp({
               <div className={`max-w-[80%] rounded-lg px-3 py-2 shadow-sm ${m.direcao === "SAIDA" ? "bg-[#d9fdd3]" : "bg-white"}`}>
                 <div className="whitespace-pre-wrap break-words">{m.conteudo}</div>
                 <div className="mt-1 text-right text-[10px] text-slate-500">
+                  {m.autor ? `${m.autor.split(" ")[0]} · ` : ""}
                   {m.quando}
                   {m.direcao === "SAIDA" && m.status === "enviada pelo celular" ? " · pelo celular" : ""}
                 </div>

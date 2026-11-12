@@ -6,6 +6,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { normalizarWhatsapp } from "@/lib/formatar";
+import { getUsuarioAtual } from "@/lib/auth";
 import { getOrganizacaoAtual } from "@/lib/org";
 import type { TipoAtividade } from "@/generated/prisma/client";
 
@@ -15,7 +16,8 @@ const texto = (f: FormData, campo: string) => {
 };
 
 export async function criarCliente(formData: FormData) {
-  const org = await getOrganizacaoAtual();
+  const eu = await getUsuarioAtual();
+  const org = eu.organizacao;
   const nome = texto(formData, "nome");
   if (!nome) throw new Error("O nome do cliente é obrigatório.");
 
@@ -25,6 +27,7 @@ export async function criarCliente(formData: FormData) {
   const cliente = await db.cliente.create({
     data: {
       organizacaoId: org.id,
+      responsavelId: eu.id,
       tipo: formData.get("tipo") === "PF" ? "PF" : "PJ",
       nome,
       nomeFantasia: texto(formData, "nomeFantasia"),
@@ -57,7 +60,8 @@ export async function criarCliente(formData: FormData) {
 const TIPOS: TipoAtividade[] = ["NOTA", "LIGACAO", "WHATSAPP", "EMAIL", "REUNIAO", "VISITA", "TAREFA"];
 
 export async function adicionarAtividade(clienteId: string, formData: FormData) {
-  const org = await getOrganizacaoAtual();
+  const eu = await getUsuarioAtual();
+  const org = eu.organizacao;
   const cliente = await db.cliente.findFirst({ where: { id: clienteId, organizacaoId: org.id } });
   if (!cliente) throw new Error("Cliente não encontrado.");
 
@@ -70,6 +74,7 @@ export async function adicionarAtividade(clienteId: string, formData: FormData) 
     data: {
       organizacaoId: org.id,
       clienteId,
+      usuarioId: eu.id,
       tipo,
       descricao,
       agendadaPara: quando ? new Date(`${quando}T09:00:00-03:00`) : null,

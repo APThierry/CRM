@@ -2,7 +2,7 @@
 // POST /api/whatsapp/webhook
 import { timingSafeEqual } from "node:crypto";
 import { db } from "@/lib/db";
-import { getOrganizacaoAtual } from "@/lib/org";
+import { getOrganizacaoPadrao } from "@/lib/org";
 import { encontrarPorTelefone, textoDaMensagem, type ConteudoWhatsapp } from "@/lib/whatsapp/mensagens";
 
 type MensagemRecebida = {
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   const config = corpo.instance
     ? await db.configuracaoWhatsapp.findFirst({ where: { instancia: corpo.instance } })
     : null;
-  const organizacaoId = config?.organizacaoId ?? (await getOrganizacaoAtual()).id;
+  const organizacaoId = config?.organizacaoId ?? (await getOrganizacaoPadrao()).id;
 
   const mensagens = (Array.isArray(corpo.data) ? corpo.data : [corpo.data]) as MensagemRecebida[];
   let salvas = 0;

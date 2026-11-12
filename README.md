@@ -46,6 +46,10 @@ npm run whatsapp:local  # terminal 3 (opcional): Evolution API, ver docs/WHATSAP
 npm run dev           # abre em http://localhost:3000
 ```
 
+## Primeiro acesso
+
+Na primeira vez, abra http://localhost:3000. Como ninguém tem senha ainda, o CRM mostra **Primeiro acesso**: crie o administrador (nome, e-mail e senha). Depois, em **Usuários**, cadastre a equipe.
+
 ## Telas prontas
 
 | Tela | Endereço | O que faz |
@@ -56,4 +60,6 @@ npm run dev           # abre em http://localhost:3000
 | Turmas | `/turmas` | Agenda, cadastro e edição; na turma: inscrição de alunos, presença, aprovação e emissão de certificados |
 | Certificados | `/certificados` | Todos os certificados, filtro válido/vencendo/vencido, busca e impressão (PDF) |
 | WhatsApp | `/whatsapp` | Conexão do número por QR Code e conversas recentes; a conversa com cada cliente fica na ficha dele |
+| Usuários | `/usuarios` | Cadastro da equipe, papéis, desativar e redefinir senha (só administrador) |
+| Meu perfil | `/perfil` | Nome, senha e assinatura no WhatsApp |
 | Cursos | `/cursos` | Os 9 cursos da Brigada MG (somente leitura por enquanto) |

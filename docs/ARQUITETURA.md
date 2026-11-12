@@ -74,8 +74,13 @@ prisma/
 scripts/
   banco-local.mjs      PostgreSQL local para desenvolvimento (npm run db:local)
 src/
+  proxy.ts             checagem rápida: sem cookie de sessão -> /login
   app/                 páginas e rotas (cada pasta vira uma URL)
-    page.tsx           painel (/)
+    (publico)/login/   entrar, sair e primeiro acesso (sem menu)
+    (crm)/             páginas que exigem login (layout com menu)
+    (crm)/page.tsx     painel (/)
+    (crm)/usuarios/    gestão de usuários (admin) + formulários do perfil
+    (crm)/perfil/      meu perfil
     clientes/          lista, novo, ficha [id] e actions.ts (gravações)
     funil/             Kanban (kanban.tsx roda no navegador) e actions.ts
     turmas/            lista, nova, [id] (alunos e certificados), [id]/editar e actions.ts
@@ -84,7 +89,10 @@ src/
   components/          peças visuais reutilizadas (menu, cabeçalho, etiquetas)
   lib/
     db.ts              conexão com o banco
-    org.ts             organização atual (vira "usuário logado" na Fase 2)
+    auth.ts            usuário logado (getUsuarioAtual) e papéis (exigirPapel)
+    sessao.ts          criar/ler/encerrar sessões (cookie + tabela Sessao)
+    senha.ts           hash e conferência de senhas (scrypt)
+    org.ts             organização do usuário logado; organização padrão para o webhook
     formatar.ts        moeda, datas, CPF, telefone e link do WhatsApp
     certificados.ts    validade, numeração e situação dos certificados
   generated/prisma/    código gerado pelo Prisma (não editar, não vai para o Git)
@@ -97,3 +105,12 @@ docs/                  esta documentação
 - **`<Suspense>` + `connection()`**: o projeto usa *Cache Components* do Next.js 16. Toda parte que lê o banco fica dentro de `<Suspense>` e chama `await connection()`, para buscar dados novos a cada acesso.
 - **Server Actions** (`actions.ts`): gravações chamadas pelos formulários. Toda action confere se o registro pertence à organização atual.
 - **Client Components** (`"use client"`): só onde precisa de interação no navegador, como o Kanban e o menu.
+
+## Login e permissões
+
+- **Pastas entre parênteses** (`(crm)`, `(publico)`) agrupam páginas sem mudar o endereço. `(crm)` tem o menu e exige login; `(publico)` não.
+- **`src/proxy.ts`** só confere se o cookie existe (rápido). A conferência de verdade é no servidor: `getUsuarioAtual()` procura a sessão no banco e, se não houver, redireciona para `/login`.
+- **Toda Server Action** chama `getUsuarioAtual()` ou `getOrganizacaoAtual()`, então nenhuma gravação acontece sem login, mesmo que alguém chame a action direto.
+- **Ações restritas** usam `exigirPapel("ADMIN")`.
+- **Sessão:** o cookie `crm_sessao` guarda um código aleatório; a tabela `Sessao` guarda só o SHA-256 dele. Desativar um usuário ou redefinir a senha apaga as sessões, desconectando na hora.
+- **Webhook do WhatsApp** fica fora do login (tem o próprio segredo) e usa `getOrganizacaoPadrao()`.

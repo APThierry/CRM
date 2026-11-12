@@ -39,8 +39,8 @@ async function FichaCliente({ params }: { params: PageProps<"/clientes/[id]">["p
     include: {
       contatos: { orderBy: { principal: "desc" } },
       negocios: { include: { etapa: true, servico: true }, orderBy: { criadoEm: "desc" } },
-      mensagens: { orderBy: { criadoEm: "desc" }, take: 50 },
-      atividades: { orderBy: [{ concluida: "asc" }, { criadoEm: "desc" }], take: 50 },
+      mensagens: { orderBy: { criadoEm: "desc" }, take: 50, include: { usuario: { select: { nome: true } } } },
+      atividades: { orderBy: [{ concluida: "asc" }, { criadoEm: "desc" }], take: 50, include: { usuario: { select: { nome: true } } } },
       participantes: {
         include: { matriculas: { include: { turma: { include: { servico: true } } } } },
       },
@@ -184,7 +184,7 @@ async function FichaCliente({ params }: { params: PageProps<"/clientes/[id]">["p
               numeros={[...numeros].map(([valor, rotulo]) => ({ valor, rotulo }))}
               mensagens={cliente.mensagens
                 .toReversed()
-                .map((m) => ({ id: m.id, direcao: m.direcao, conteudo: m.conteudo, status: m.status, quando: dataHora(m.criadoEm) }))}
+                .map((m) => ({ id: m.id, direcao: m.direcao, conteudo: m.conteudo, status: m.status, quando: dataHora(m.criadoEm), autor: m.usuario?.nome ?? null }))}
             />
           </section>
 
@@ -220,7 +220,7 @@ async function FichaCliente({ params }: { params: PageProps<"/clientes/[id]">["p
                     <div className="flex-1">
                       <div className={a.concluida ? "line-through" : ""}>{a.descricao}</div>
                       <div className="mt-1 text-xs text-slate-500">
-                        {nomesTipo[a.tipo]} · registrado {dataHora(a.criadoEm)}
+                        {nomesTipo[a.tipo]} · {a.usuario ? `${a.usuario.nome.split(" ")[0]}, ` : ""}{dataHora(a.criadoEm)}
                         {a.agendadaPara && <span className="font-medium text-amber-700"> · para {data(a.agendadaPara)}</span>}
                       </div>
                     </div>

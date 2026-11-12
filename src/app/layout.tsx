@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { MenuLateral } from "@/components/menu-lateral";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -11,13 +10,12 @@ export const metadata: Metadata = {
   description: "CRM para empresas de treinamento em segurança",
 };
 
+// Layout raiz: vale para todas as páginas (inclusive o login).
+// O menu fica no layout de (crm), que é a parte que exige login.
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="pt-BR" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="flex min-h-full font-sans">
-        <MenuLateral />
-        <main className="min-w-0 flex-1 px-4 py-6 md:px-8 print:p-0">{children}</main>
-      </body>
+      <body className="min-h-full font-sans">{children}</body>
     </html>
   );
 }

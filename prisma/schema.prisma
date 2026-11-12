@@ -51,22 +51,42 @@ enum Papel {
 }
 
 model Usuario {
-  id            String   @id @default(cuid())
-  organizacaoId String
-  nome          String
-  email         String   @unique
-  senhaHash     String
-  papel         Papel    @default(VENDEDOR)
-  ativo         Boolean  @default(true)
-  criadoEm      DateTime @default(now())
+  id                 String    @id @default(cuid())
+  organizacaoId      String
+  nome               String
+  email              String    @unique
+  senhaHash          String
+  papel              Papel     @default(VENDEDOR)
+  ativo              Boolean   @default(true)
+  // Assinar as mensagens de WhatsApp com o nome (ex.: "*Ana:* Bom dia!")
+  assinaturaWhatsapp Boolean   @default(true)
+  ultimoAcesso       DateTime?
+  criadoEm           DateTime  @default(now())
 
-  organizacao         Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  organizacao         Organizacao        @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
   clientes            Cliente[]
   negocios            Negocio[]
   atividades          Atividade[]
   turmasComoInstrutor Turma[]
+  sessoes             Sessao[]
+  mensagens           MensagemWhatsapp[]
 
   @@index([organizacaoId])
+}
+
+// Sessão de login. O navegador guarda só um código aleatório (cookie);
+// aqui fica o "hash" desse código, então quem vê o banco não consegue entrar.
+model Sessao {
+  id        String   @id @default(cuid())
+  usuarioId String
+  tokenHash String   @unique
+  expiraEm  DateTime
+  criadoEm  DateTime @default(now())
+  navegador String?
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
 }
 
 // -----------------------------------------------------------------------------
@@ -357,11 +377,13 @@ model MensagemWhatsapp {
   conteudo      String
   status        String? // enviada, entregue, lida, erro
   idExterno     String? // id da mensagem no provedor
+  usuarioId     String? // atendente que enviou pelo CRM
   criadoEm      DateTime        @default(now())
 
   organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
   cliente     Cliente?    @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   contato     Contato?    @relation(fields: [contatoId], references: [id], onDelete: SetNull)
+  usuario     Usuario?    @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
 
   @@index([organizacaoId, telefone])
   @@index([clienteId])

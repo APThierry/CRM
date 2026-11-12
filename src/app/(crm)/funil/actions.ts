@@ -1,6 +1,7 @@
 "use server";
 import { refresh } from "next/cache";
 import { db } from "@/lib/db";
+import { getUsuarioAtual } from "@/lib/auth";
 import { getOrganizacaoAtual } from "@/lib/org";
 
 /** Move um negócio para outra etapa (chamado ao arrastar o cartão no Kanban). */
@@ -24,7 +25,8 @@ export async function moverNegocio(negocioId: string, etapaId: string) {
 }
 
 export async function criarNegocio(formData: FormData) {
-  const org = await getOrganizacaoAtual();
+  const eu = await getUsuarioAtual();
+  const org = eu.organizacao;
   const clienteId = String(formData.get("clienteId") ?? "");
   const servicoId = String(formData.get("servicoId") ?? "") || null;
 
@@ -46,6 +48,7 @@ export async function criarNegocio(formData: FormData) {
       clienteId: cliente.id,
       servicoId: servico?.id ?? null,
       etapaId: primeiraEtapa.id,
+      responsavelId: eu.id,
       valor,
       quantidadeAlunos: alunos,
     },

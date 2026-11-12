@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { db } from "@/lib/db";
 import { normalizarWhatsapp } from "@/lib/formatar";
+import { getUsuarioAtual } from "@/lib/auth";
 import { getOrganizacaoAtual } from "@/lib/org";
 import {
   desconectar,
@@ -64,7 +65,8 @@ export async function enviarParaCliente(
   _estado: { erro?: string; ok?: boolean } | null,
   formData: FormData,
 ): Promise<{ erro?: string; ok?: boolean }> {
-  const org = await getOrganizacaoAtual();
+  const eu = await getUsuarioAtual();
+  const org = eu.organizacao;
   const cliente = await db.cliente.findFirst({
     where: { id: clienteId, organizacaoId: org.id },
     include: { contatos: { orderBy: { principal: "desc" } } },
@@ -80,12 +82,15 @@ export async function enviarParaCliente(
   if (!numero) return { erro: "Este cliente não tem número de WhatsApp cadastrado." };
 
   try {
-    const { idExterno } = await enviarTexto(numero, texto);
+    // Assinatura: o cliente vê "*Ana:*" (negrito no WhatsApp) antes do texto.
+    const assinado = eu.assinaturaWhatsapp ? `*${eu.nome.split(" ")[0]}:*
+${texto}` : texto;
+    const { idExterno } = await enviarTexto(numero, assinado);
     const { contatoId } = await encontrarPorTelefone(org.id, numero);
     // A Evolution API também avisa o webhook sobre esta mensagem. Se o webhook
     // chegou primeiro, só atualizamos o registro em vez de duplicar.
     const jaSalva = idExterno ? await db.mensagemWhatsapp.findFirst({ where: { organizacaoId: org.id, idExterno } }) : null;
-    const dados = { clienteId, contatoId, telefone: numero, direcao: "SAIDA" as const, conteudo: texto, status: "enviada", idExterno };
+    const dados = { clienteId, contatoId, telefone: numero, direcao: "SAIDA" as const, conteudo: texto, status: "enviada", idExterno, usuarioId: eu.id };
     if (jaSalva) await db.mensagemWhatsapp.update({ where: { id: jaSalva.id }, data: dados });
     else await db.mensagemWhatsapp.create({ data: { ...dados, organizacaoId: org.id } });
     refresh();
