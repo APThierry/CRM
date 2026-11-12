@@ -34,6 +34,17 @@ export function normalizarWhatsapp(telefone: string | null | undefined) {
   return digitos.startsWith("55") ? digitos : `55${digitos}`;
 }
 
+/**
+ * Chave para comparar telefones brasileiros: DDD + últimos 8 dígitos.
+ * Resolve o "nono dígito": o WhatsApp às vezes identifica 5531988887777 como
+ * 553188887777. As duas formas viram "3188887777".
+ */
+export function chaveTelefone(telefone: string | null | undefined) {
+  const d = (telefone ?? "").replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
+  if (d.length < 10) return null;
+  return d.slice(0, 2) + d.slice(-8);
+}
+
 /** Link que abre a conversa no WhatsApp (celular ou WhatsApp Web). */
 export function linkWhatsapp(telefone: string | null | undefined, texto?: string) {
   const numero = normalizarWhatsapp(telefone);

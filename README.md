@@ -42,6 +42,7 @@ cp .env.example .env
 npm run db:local      # terminal 1: sobe o PostgreSQL local (deixe aberto)
 npm run db:migrate    # terminal 2: cria as tabelas
 npm run db:seed       # dados de exemplo da Brigada MG
+npm run whatsapp:local  # terminal 3 (opcional): Evolution API, ver docs/WHATSAPP.md
 npm run dev           # abre em http://localhost:3000
 ```
 
@@ -54,4 +55,5 @@ npm run dev           # abre em http://localhost:3000
 | Funil de vendas | `/funil` | Kanban de arrastar e soltar, criação de negócios |
 | Turmas | `/turmas` | Agenda, cadastro e edição; na turma: inscrição de alunos, presença, aprovação e emissão de certificados |
 | Certificados | `/certificados` | Todos os certificados, filtro válido/vencendo/vencido, busca e impressão (PDF) |
+| WhatsApp | `/whatsapp` | Conexão do número por QR Code e conversas recentes; a conversa com cada cliente fica na ficha dele |
 | Cursos | `/cursos` | Os 9 cursos da Brigada MG (somente leitura por enquanto) |

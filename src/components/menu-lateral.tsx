@@ -16,6 +16,7 @@ const itens = [
   { href: "/turmas", rotulo: "Turmas", icone: "◷" },
   { href: "/certificados", rotulo: "Certificados", icone: "✎" },
   { href: "/cursos", rotulo: "Cursos", icone: "✚" },
+  { href: "/whatsapp", rotulo: "WhatsApp", icone: "✆" },
 ] as const;
 
 export function MenuLateral() {
@@ -29,10 +30,6 @@ export function MenuLateral() {
         <Suspense fallback={<Itens caminho={null} />}>
           <ItensComDestaque />
         </Suspense>
-        <span className="mt-2 flex items-center gap-3 rounded-md px-3 py-2 text-sm text-marca-100/40">
-          <span aria-hidden className="w-4 text-center">✆</span>
-          WhatsApp <span className="ml-auto text-[10px] uppercase">em breve</span>
-        </span>
       </nav>
     </aside>
   );

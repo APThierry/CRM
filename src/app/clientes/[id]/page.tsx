@@ -5,9 +5,11 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { Cabecalho, Carregando, Etiqueta, Vazio } from "@/components/ui";
 import { db } from "@/lib/db";
-import { data, dataHora, linkWhatsapp, moeda, telefone } from "@/lib/formatar";
+import { data, dataHora, linkWhatsapp, moeda, normalizarWhatsapp, telefone } from "@/lib/formatar";
 import { getOrganizacaoAtual } from "@/lib/org";
+import { estadoConexao } from "@/lib/whatsapp/evolution";
 import { adicionarAtividade, alternarConclusao } from "../actions";
+import { ConversaWhatsapp } from "./conversa-whatsapp";
 
 const nomesTipo: Record<string, string> = {
   NOTA: "📝 Nota",
@@ -37,6 +39,7 @@ async function FichaCliente({ params }: { params: PageProps<"/clientes/[id]">["p
     include: {
       contatos: { orderBy: { principal: "desc" } },
       negocios: { include: { etapa: true, servico: true }, orderBy: { criadoEm: "desc" } },
+      mensagens: { orderBy: { criadoEm: "desc" }, take: 50 },
       atividades: { orderBy: [{ concluida: "asc" }, { criadoEm: "desc" }], take: 50 },
       participantes: {
         include: { matriculas: { include: { turma: { include: { servico: true } } } } },
@@ -49,6 +52,16 @@ async function FichaCliente({ params }: { params: PageProps<"/clientes/[id]">["p
   const certificados = cliente.participantes.flatMap((p) => p.matriculas.map((m) => ({ ...m, participante: p.nome })));
   const hoje = new Date();
   const acaoAtividade = adicionarAtividade.bind(null, cliente.id);
+  const whatsapp = await estadoConexao();
+
+  // Números de WhatsApp do cliente e dos contatos, sem repetir.
+  const numeros = new Map<string, string>();
+  const addNumero = (n: string | null, quem: string) => {
+    const v = normalizarWhatsapp(n);
+    if (v && !numeros.has(v)) numeros.set(v, `${quem} · ${telefone(v)}`);
+  };
+  addNumero(cliente.whatsapp, cliente.nomeFantasia ?? "Cliente");
+  cliente.contatos.forEach((c) => addNumero(c.whatsapp, c.nome));
 
   return (
     <>
@@ -161,6 +174,18 @@ async function FichaCliente({ params }: { params: PageProps<"/clientes/[id]">["p
                 ))}
               </ul>
             )}
+          </section>
+
+          <section id="whatsapp" className="cartao p-4 text-sm">
+            <h2 className="mb-3 font-semibold">💬 WhatsApp</h2>
+            <ConversaWhatsapp
+              clienteId={cliente.id}
+              conectado={whatsapp.estado === "open"}
+              numeros={[...numeros].map(([valor, rotulo]) => ({ valor, rotulo }))}
+              mensagens={cliente.mensagens
+                .toReversed()
+                .map((m) => ({ id: m.id, direcao: m.direcao, conteudo: m.conteudo, status: m.status, quando: dataHora(m.criadoEm) }))}
+            />
           </section>
 
           <section className="cartao p-4 text-sm">

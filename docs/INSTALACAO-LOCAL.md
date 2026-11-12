@@ -72,4 +72,25 @@ Depois abra http://localhost:3000.
 |---|---|
 | `Can't reach database server at localhost:5433` | O banco não está ligado. Rode `npm run db:local`. |
 | Erro de tipo dizendo que um campo não existe | Faltou `npx prisma generate` depois de mudar o schema. |
+| `character with byte sequence ... has no equivalent in encoding "WIN1252"` | O banco foi criado sem UTF-8 (instalações antigas). Veja "Converter o banco para UTF-8" abaixo. |
 | `Cannot find name 'PageProps'` | Rode `npx next typegen` ou `npm run dev` uma vez. |
+
+## Converter o banco para UTF-8
+
+O `npm run db:local` cria o banco em UTF-8 desde 12/11/2026. Instalações anteriores ficaram em WIN1252, que não aceita emojis (mensagens de WhatsApp falham).
+
+Para converter sem perder dados:
+
+1. Pare o CRM e a Evolution API (deixe só o `db:local` ligado).
+2. Renomeie os bancos antigos e crie os novos em UTF-8 (com `psql` ou um script Node):
+   ```sql
+   ALTER DATABASE crm RENAME TO crm_win1252;
+   CREATE DATABASE crm ENCODING 'UTF8' TEMPLATE template0 LC_COLLATE 'C' LC_CTYPE 'C';
+   ```
+   (faça o mesmo para `evolution` e recrie o `crm_shadow`)
+3. Crie as tabelas: `npx prisma migrate deploy` no CRM e `npx prisma migrate deploy --schema prisma/postgresql-schema.prisma` na Evolution API.
+4. Copie os dados:
+   ```bash
+   node scripts/copiar-banco.mjs postgresql://postgres:postgres@localhost:5433/crm_win1252 postgresql://postgres:postgres@localhost:5433/crm
+   ```
+5. Depois de conferir que está tudo certo, apague os bancos `*_win1252`.

@@ -33,10 +33,13 @@
 
 ## Fase 3: WhatsApp
 - [x] Decidir o provedor: Evolution API (usa o Baileys por dentro)
-- [ ] Subir a Evolution API (na VPS ou local com Docker)
-- [ ] Conectar número por QR Code
-- [ ] Enviar mensagem a partir da ficha do cliente
-- [ ] Receber mensagens (webhook) e mostrar a conversa
+- [x] Subir a Evolution API localmente (Node, sem Docker)
+- [x] Conectar número por QR Code (tela WhatsApp)
+- [x] Enviar mensagem a partir da ficha do cliente (com modelos)
+- [x] Receber mensagens (webhook protegido por segredo) e mostrar a conversa
+- [ ] Enviar e receber arquivos (proposta em PDF, fotos)
+- [ ] Cadastrar cliente a partir de um número não cadastrado
+- [ ] Subir a Evolution API na VPS
 
 ## Fase 4: Reciclagem e painel
 - [x] Lista de certificados vencendo

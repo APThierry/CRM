@@ -15,6 +15,9 @@ const pg = new EmbeddedPostgres({
   password: "postgres",
   port: porta,
   persistent: true,
+  // UTF-8 é obrigatório: sem isso o Windows cria o banco em WIN1252 e
+  // mensagens com emoji (WhatsApp) não podem ser salvas.
+  initdbFlags: ["--encoding=UTF8", "--locale=C"],
   onLog: () => {},
 });
 
