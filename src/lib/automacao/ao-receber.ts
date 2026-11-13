@@ -2,6 +2,7 @@ import "server-only";
 // O que o CRM faz sozinho quando chega mensagem de um cliente:
 //
 // 1. Cancela os follow-ups agendados da conversa ("cancelar se o cliente responder").
+//    Campanhas: marca "respondeu"; se a mensagem for SAIR, descadastra e para aqui.
 // 2. Fora do horário de atendimento: manda o aviso (no máximo 1 vez a cada 12 horas).
 // 3. Chatbot: em conversa nova (ou parada há tempo) e sem atendente, manda o menu.
 //    Quando o cliente escolhe uma opção, responde, coloca a etiqueta e, se a opção
@@ -11,6 +12,7 @@ import "server-only";
 // Erros aqui nunca derrubam o recebimento: só aparecem no terminal.
 import type { Conversa, TipoMensagem } from "@/generated/prisma/client";
 import { preencherVariaveis } from "@/lib/atendimento";
+import { aoResponderCampanha } from "@/lib/campanhas/status";
 import { db } from "@/lib/db";
 import { enviarAutomatico } from "@/lib/whatsapp/enviar";
 import { lerAutomacao, textoDoMenu } from "./config";
@@ -24,7 +26,7 @@ const INTERVALO_AVISO_FORA_HORARIO = 12 * HORA;
 
 type Recebida = {
   /** A conversa como estava ANTES desta mensagem. */
-  conversa: Pick<Conversa, "id" | "organizacaoId" | "ultimaEm" | "ultimaTexto">;
+  conversa: Pick<Conversa, "id" | "organizacaoId" | "telefone" | "ultimaEm" | "ultimaTexto">;
   tipo: TipoMensagem;
   conteudo: string;
   criadoEm: Date;
@@ -41,6 +43,10 @@ export async function aoReceberDoCliente(m: Recebida) {
 
   const agora = new Date();
   if (agora.getTime() - m.criadoEm.getTime() > ATRASO_MAXIMO) return;
+
+  // Campanhas: marca "respondeu" e trata o SAIR (descadastro). Quem saiu não recebe o chatbot.
+  const saiu = await aoResponderCampanha({ organizacaoId, telefone: m.conversa.telefone, conteudo: m.conteudo, tipo: m.tipo });
+  if (saiu) return;
 
   const config = await lerAutomacao(organizacaoId);
   if (!config || (!config.horarioAtivo && !config.botAtivo)) return;

@@ -49,7 +49,7 @@
 
 ## Fase 4: Reciclagem e painel
 - [x] Lista de certificados vencendo
-- [ ] Lembrete automático por WhatsApp
+- [x] Lembrete de reciclagem por WhatsApp (Fase D, com aprovação do gestor)
 - [ ] Painel: vendas do mês, valor no funil, conversão, turmas da semana
 
 ## Fase 5: Produção
@@ -83,5 +83,17 @@
   - [x] Modo simulação (WHATSAPP_SIMULAR_ENVIO=1) para testar sem enviar nada
   - [ ] Gatilho pelo funil (ao mudar de etapa, iniciar uma sequência ou criar tarefa)
   - [ ] Menu do chatbot com submenus
-- [ ] Fase D: Campanhas (disparos protegidos, reciclagem automática, status)
+- [x] Fase D: Campanhas
+  - [x] Público por segmento, cidade, etiqueta, curso e certificados vencendo/vencidos
+  - [x] Ritmo protegido: 60–120 s entre mensagens, pausa de 10 min a cada 30, 150 por dia, só no horário
+  - [x] Variações de texto ({Olá|Oi}) e convite para SAIR em toda mensagem
+  - [x] Descadastro por "SAIR" (vale para campanhas futuras), com confirmação
+  - [x] Rascunho, teste para o próprio número, iniciar/agendar, pausar, retomar, cancelar, tirar destinatário
+  - [x] Pausa automática com WhatsApp desconectado ou 3 erros seguidos
+  - [x] Status por destinatário: enviada, entregue, lida, respondeu, erro
+  - [x] Reciclagem: lista de certificados vencendo, campanha preparada com negócios no funil, gestor aprova
+  - [x] Teste automático em modo simulação (scripts/testar-campanhas.mts)
+  - [ ] Campanhas com foto ou PDF
+  - [ ] Tela para mudar o ritmo (hoje fixo em ritmo.ts)
+  - [ ] Esconder o item Campanhas do menu para quem não é gestor
 - [ ] Fase E: Relatórios e integrações (por atendente, exportação, Google Agenda, webhooks)

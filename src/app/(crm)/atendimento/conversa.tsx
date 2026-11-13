@@ -175,7 +175,9 @@ function Balao({ m, autor }: { m: MensagemWhatsapp; autor: string | null }) {
                 ? "pelo celular · "
                 : m.status === "automática"
                   ? "🤖 automática · "
-                  : "")}
+                  : m.status === "campanha"
+                    ? "📣 campanha · "
+                    : "")}
           {hora(m.criadoEm)}
           {m.status === "erro" && <span className="ml-1 text-red-600">falhou</span>}
         </div>

@@ -94,6 +94,8 @@ export async function enviarAutomatico(
   conversa: Pick<Conversa, "organizacaoId" | "telefone">,
   texto: string,
   autor?: Pick<UsuarioAtual, "id" | "nome" | "assinaturaWhatsapp"> | null,
+  /** Como aparece na conversa (padrão: "agendada" ou "automática"). Campanhas usam "campanha". */
+  rotulo?: string,
 ) {
   const { idExterno } = await enviarTexto(conversa.telefone, autor ? assinar(autor, texto) : texto);
   await registrarMensagem({
@@ -101,10 +103,11 @@ export async function enviarAutomatico(
     telefone: conversa.telefone,
     direcao: "SAIDA",
     conteudo: texto,
-    status: autor ? "agendada" : "automática",
+    status: rotulo ?? (autor ? "agendada" : "automática"),
     idExterno,
     usuarioId: autor?.id ?? null,
   });
+  return { idExterno };
 }
 
 async function enviarSoTexto(eu: UsuarioAtual, conversa: Pick<Conversa, "organizacaoId" | "telefone">, texto: string) {

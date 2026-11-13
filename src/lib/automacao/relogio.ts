@@ -1,14 +1,15 @@
 import "server-only";
 // O "relógio" da automação: a cada 30 segundos envia as mensagens agendadas
-// que já passaram da hora. Começa junto com o servidor (src/instrumentation.ts).
+// que já passaram da hora e a próxima mensagem das campanhas (src/lib/campanhas/motor.ts). Começa junto com o servidor (src/instrumentation.ts).
 //
 // Na VPS rodamos UM processo do CRM, então não há dois relógios disputando.
 // Mesmo assim cada mensagem é "reservada" (PENDENTE -> ENVIANDO) antes de sair,
 // para nunca ser enviada duas vezes.
 import { preencherVariaveis } from "@/lib/atendimento";
+import { processarCampanhas } from "@/lib/campanhas/motor";
 import { db } from "@/lib/db";
 import { enviarAutomatico } from "@/lib/whatsapp/enviar";
-import { ErroWhatsapp } from "@/lib/whatsapp/evolution";
+import { ErroWhatsapp, garantirWebhook } from "@/lib/whatsapp/evolution";
 
 const INTERVALO = 30_000;
 const POR_RODADA = 20;
@@ -70,6 +71,13 @@ export function iniciarRelogio() {
       if (r.vistas) console.log(`[relógio] ${r.enviadas} de ${r.vistas} mensagem(ns) agendada(s) enviada(s)`);
     } catch (e) {
       console.error("[relógio] falhou:", e);
+    }
+    // Campanhas (Fase D): no máximo uma mensagem por organização a cada rodada.
+    try {
+      const c = await processarCampanhas();
+      if (c.enviadas) console.log(`[relógio] ${c.enviadas} mensagem(ns) de campanha enviada(s)`);
+    } catch (e) {
+      console.error("[relógio] campanhas falharam:", e);
     } finally {
       rodando = false;
     }
@@ -77,5 +85,7 @@ export function iniciarRelogio() {
   global.relogioCrm = setInterval(rodada, INTERVALO);
   global.relogioCrm.unref?.();
   setTimeout(rodada, 5_000); // uma rodada logo depois de ligar
+  // Garante que a Evolution API manda também os avisos de entregue/lida (campanhas).
+  garantirWebhook().catch((e) => console.warn("[relógio] não consegui atualizar o webhook do WhatsApp:", e instanceof Error ? e.message : e));
   console.log("[relógio] automação ligada: conferindo mensagens agendadas a cada 30 s");
 }

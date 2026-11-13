@@ -132,6 +132,70 @@ WHATSAPP_SIMULAR_ENVIO="1"
 
 Com isso, tudo que o CRM "enviaria" fica registrado na conversa, mas nada sai para o WhatsApp. A tela Automação mostra um aviso amarelo enquanto o modo simulação está ligado. Apague o arquivo (e reinicie o `npm run dev`) para voltar a enviar de verdade.
 
+## Campanhas (menu Campanhas)
+
+Só administrador e gestor. Uma campanha manda **uma mensagem para cada cliente** do público escolhido, devagar, para proteger o número da empresa.
+
+### Proteções (ritmo "conservador", escolhido em 13/11/2026)
+
+| Regra | Valor |
+|---|---|
+| Intervalo entre mensagens | 60 a 120 segundos, sorteado |
+| Pausa longa | 10 minutos a cada 30 mensagens |
+| Limite diário | 150 mensagens (todas as campanhas somadas) |
+| Quando envia | Só no horário de atendimento (tela Automação), mesmo com o aviso de fora do horário desligado |
+| Uma por vez | Só uma campanha envia por vez; as outras esperam como "Agendada" |
+| Texto | Variações `{Olá\|Oi\|Bom dia}` sorteadas por cliente, e o convite *"Para não receber mais estas mensagens, responda SAIR."* sempre no fim |
+| Pausa automática | WhatsApp desconectado, ou 3 erros seguidos |
+
+Os valores ficam em `src/lib/campanhas/ritmo.ts`.
+
+### Quem recebe
+
+- Clientes cadastrados com WhatsApp (o contato principal; senão, o WhatsApp do cliente). Uma mensagem por cliente.
+- Filtros: segmento, cidade, etiqueta da conversa, curso já feito e certificados vencendo (60 dias) ou vencidos.
+- Ficam de fora: quem pediu para sair, quem não tem WhatsApp e números repetidos. A tela Nova campanha mostra quem fica de fora e por quê.
+
+### Passo a passo
+
+1. **Campanhas → + Nova campanha**: escolha o público (a lista ao lado mostra quem recebe e o tempo estimado) e escreva a mensagem.
+2. **Criar rascunho**: nada é enviado ainda.
+3. Na campanha: confira a prévia, use **Enviar teste** para o seu número (sai com *[TESTE]*), tire quem não deve receber.
+4. **▶ Iniciar** (ou escolha "Começar em" para agendar). A página se atualiza sozinha a cada 15 s enquanto envia.
+5. Acompanhe: na fila, enviadas, entregues, lidas, responderam, erros e fora. **⏸ Pausar** e **▶ Retomar** a qualquer momento; **Cancelar** tira quem ainda não recebeu.
+
+### Descadastro (SAIR)
+
+Se o cliente responder só "SAIR" (ou "parar", "pare", "cancelar", "stop", "remover"), o CRM:
+- grava o número na lista de quem saiu (vale para todas as campanhas futuras);
+- tira o número das campanhas que ainda não chegaram nele;
+- responde confirmando, uma vez;
+- não manda o chatbot.
+
+Frases como "quero sair da turma de sábado" **não** descadastram.
+
+### Reciclagem (o gestor aprova)
+
+Na tela Campanhas, o bloco **🔁 Reciclagem** lista os clientes com certificados que vencem nos próximos X dias (padrão: 60) ou que venceram há até 30 dias e ainda não foram avisados. Em **Preparar campanha de reciclagem**, o CRM:
+- cria **um negócio de reciclagem no funil** para cada curso de cada cliente (na primeira etapa, com nº de alunos, valor pelo preço do curso e previsão na data do vencimento);
+- registra uma nota no histórico do cliente;
+- monta a campanha como **rascunho**, com `{curso}`, `{vencimento}` e `{cliente}` preenchidos;
+- marca os certificados como avisados, para não entrarem de novo.
+
+Nada é enviado até o gestor revisar e clicar em **Iniciar**. A antecedência e o texto ficam em *Configurar reciclagem*.
+
+### Status de entregue e lida
+
+O CRM pede à Evolution API também o evento `MESSAGES_UPDATE` (avisos de entregue e lida). O webhook é atualizado sozinho quando o servidor do CRM liga. Se a Evolution API estiver desligada nessa hora, clique em **Conectar** na tela WhatsApp depois (isso reconfigura o webhook).
+
+### Testar
+
+```bash
+npx tsx --conditions=react-server scripts/testar-campanhas.mts
+```
+
+Roda 25 verificações no banco local **em modo simulação** (ritmo, horário, envio, entregue/lida, resposta, SAIR, reciclagem) e apaga tudo o que criou no fim.
+
 ## Variáveis do CRM (`.env`)
 
 | Variável | Para quê |
@@ -161,11 +225,18 @@ Com isso, tudo que o CRM "enviaria" fica registrado na conversa, mas nada sai pa
 | `src/instrumentation.ts` | Liga o relógio quando o servidor sobe |
 | `src/app/(crm)/automacao/` | Tela Automação |
 | `src/app/(crm)/whatsapp/` | Tela de conexão (QR Code) |
+| `src/lib/campanhas/ritmo.ts` | Regras de proteção (intervalo, pausa, limite, variações, SAIR) |
+| `src/lib/campanhas/motor.ts` | Envia a próxima mensagem de campanha (chamado pelo relógio) |
+| `src/lib/campanhas/publico.ts` | Monta o público e tira quem saiu |
+| `src/lib/campanhas/status.ts` | Entregue/lida, "respondeu" e descadastro |
+| `src/lib/campanhas/reciclagem.ts` | Lista de reciclagem e preparação da campanha com negócios no funil |
+| `src/app/(crm)/campanhas/` | Telas de campanhas |
 | `src/app/(crm)/clientes/[id]/conversa-whatsapp.tsx` | Conversa na ficha do cliente |
 
 ## Limitações atuais
 
 - Mídias recebidas **antes** da Fase B (12/11/2026) não têm o arquivo, só a descrição ("📷 Imagem").
 - Ainda não dá para gravar áudio direto no CRM: anexe um arquivo de áudio.
-- Sem envio em massa (de propósito, por causa do risco de banimento).
+- Campanhas só com texto (sem foto ou PDF) e com o ritmo fixo do arquivo `ritmo.ts` (sem tela para mudar).
+- Os avisos de entregue/lida só são guardados para mensagens de campanha.
 - Na VPS, o webhook vai usar o endereço interno do Docker. Isso entra no guia de deploy.

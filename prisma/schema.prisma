@@ -48,6 +48,8 @@ model Organizacao {
   opcoesBot     OpcaoBot[]
   sequencias    Sequencia[]
   agendadas     MensagemAgendada[]
+  campanhas     Campanha[]
+  descadastros  Descadastro[]
 }
 
 enum Papel {
@@ -81,6 +83,7 @@ model Usuario {
   respostas           RespostaRapida[]
   opcoesBot           OpcaoBot[]
   agendadas           MensagemAgendada[]
+  campanhas           Campanha[]
 
   @@index([organizacaoId])
 }
@@ -128,8 +131,8 @@ model Cliente {
   criadoEm      DateTime    @default(now())
   atualizadoEm  DateTime    @updatedAt
 
-  organizacao   Organizacao        @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
-  responsavel   Usuario?           @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
+  organizacao   Organizacao            @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  responsavel   Usuario?               @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
   contatos      Contato[]
   negocios      Negocio[]
   turmas        Turma[]
@@ -137,6 +140,7 @@ model Cliente {
   atividades    Atividade[]
   mensagens     MensagemWhatsapp[]
   conversas     Conversa[]
+  campanhas     DestinatarioCampanha[]
 
   @@index([organizacaoId])
   @@index([organizacaoId, nome])
@@ -208,13 +212,14 @@ model Negocio {
   criadoEm           DateTime  @default(now())
   atualizadoEm       DateTime  @updatedAt
 
-  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
-  cliente     Cliente     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  contato     Contato?    @relation(fields: [contatoId], references: [id], onDelete: SetNull)
-  etapa       EtapaFunil  @relation(fields: [etapaId], references: [id])
-  servico     Servico?    @relation(fields: [servicoId], references: [id], onDelete: SetNull)
-  responsavel Usuario?    @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
+  organizacao Organizacao            @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  cliente     Cliente                @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  contato     Contato?               @relation(fields: [contatoId], references: [id], onDelete: SetNull)
+  etapa       EtapaFunil             @relation(fields: [etapaId], references: [id])
+  servico     Servico?               @relation(fields: [servicoId], references: [id], onDelete: SetNull)
+  responsavel Usuario?               @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
   atividades  Atividade[]
+  campanhas   DestinatarioCampanha[]
 
   @@index([organizacaoId, etapaId])
 }
@@ -312,6 +317,8 @@ model Matricula {
   certificadoNumero String?
   validadeAte       DateTime?
   emitidoEm         DateTime? // data de emissão do certificado
+  // Quando o certificado entrou numa campanha de reciclagem (para não avisar duas vezes).
+  reciclagemEm      DateTime?
 
   turma        Turma        @relation(fields: [turmaId], references: [id], onDelete: Cascade)
   participante Participante @relation(fields: [participanteId], references: [id], onDelete: Cascade)
@@ -511,6 +518,9 @@ model ConfiguracaoAutomacao {
   botBoasVindas       String
   // O bot só se apresenta em conversa nova ou parada há pelo menos estas horas.
   botReativarHoras    Int      @default(24)
+  // Reciclagem (Fase D): avisar X dias antes do vencimento dos certificados.
+  reciclagemDias      Int      @default(60)
+  reciclagemTexto     String   @default("{Olá|Oi}{, primeiro_nome}! Aqui é da {empresa}. Passando para avisar que os certificados de {curso} vencem em {vencimento}. {Quer|Podemos} já reservar a turma de reciclagem?")
   atualizadoEm        DateTime @updatedAt
 
   organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
@@ -591,4 +601,102 @@ model MensagemAgendada {
 
   @@index([status, enviarEm])
   @@index([conversaId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Campanhas (Fase D): disparos protegidos e reciclagem
+// ---------------------------------------------------------------------------
+
+enum TipoCampanha {
+  MANUAL // o gestor escolhe o público
+  RECICLAGEM // montada a partir dos certificados vencendo
+}
+
+enum StatusCampanha {
+  RASCUNHO // montada, esperando o gestor revisar e iniciar
+  AGENDADA // vai começar em iniciarEm (ou quando a campanha anterior terminar)
+  ENVIANDO
+  PAUSADA // pelo gestor, ou sozinha (WhatsApp caiu, erros seguidos)
+  CONCLUIDA
+  CANCELADA
+}
+
+/// Disparo para vários clientes, no ritmo protegido de src/lib/campanhas/ritmo.ts.
+/// Só uma campanha envia por vez em cada organização (um número de WhatsApp).
+model Campanha {
+  id             String         @id @default(cuid())
+  organizacaoId  String
+  nome           String
+  tipo           TipoCampanha   @default(MANUAL)
+  // Aceita variações {Olá|Oi|Bom dia} e variáveis ({primeiro_nome}, {empresa}...).
+  texto          String
+  // Público escolhido (para mostrar depois): segmento, cidade, etiqueta, curso...
+  filtro         Json?
+  status         StatusCampanha @default(RASCUNHO)
+  iniciarEm      DateTime? // começar a partir de (vazio = assim que iniciar)
+  proximoEnvioEm DateTime? // o relógio só envia a próxima depois disso
+  motivo         String? // por que pausou
+  criadoPorId    String?
+  criadoEm       DateTime       @default(now())
+  iniciadaEm     DateTime?
+  concluidaEm    DateTime?
+
+  organizacao   Organizacao            @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  criadoPor     Usuario?               @relation(fields: [criadoPorId], references: [id], onDelete: SetNull)
+  destinatarios DestinatarioCampanha[]
+
+  @@index([organizacaoId, status])
+}
+
+enum StatusDestinatario {
+  PENDENTE
+  ENVIANDO
+  ENVIADA
+  ERRO
+  IGNORADA // descadastrado, sem telefone válido ou retirado pelo gestor
+}
+
+model DestinatarioCampanha {
+  id          String             @id @default(cuid())
+  campanhaId  String
+  clienteId   String?
+  contatoId   String?
+  negocioId   String? // reciclagem: o negócio criado no funil
+  nome        String // quem recebe (contato ou cliente)
+  telefone    String
+  chave       String // DDD + 8 últimos dígitos
+  ordem       Int
+  // Valores extras para o texto (reciclagem: {curso}, {vencimento}, {cliente}).
+  variaveis   Json?
+  status      StatusDestinatario @default(PENDENTE)
+  motivo      String?
+  textoFinal  String? // o texto que saiu de verdade (com a variação sorteada)
+  idExterno   String? // id da mensagem no WhatsApp (para entregue/lida)
+  enviadaEm   DateTime?
+  entregueEm  DateTime?
+  lidaEm      DateTime?
+  respondeuEm DateTime?
+
+  campanha Campanha @relation(fields: [campanhaId], references: [id], onDelete: Cascade)
+  cliente  Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  negocio  Negocio? @relation(fields: [negocioId], references: [id], onDelete: SetNull)
+
+  @@unique([campanhaId, chave])
+  @@index([campanhaId, status, ordem])
+  @@index([idExterno])
+  @@index([chave, enviadaEm])
+}
+
+/// Quem pediu para não receber campanhas (respondeu SAIR). Vale por número.
+model Descadastro {
+  id            String   @id @default(cuid())
+  organizacaoId String
+  chave         String // DDD + 8 últimos dígitos
+  telefone      String
+  origem        String // "respondeu SAIR", "marcado pelo atendente"...
+  criadoEm      DateTime @default(now())
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+
+  @@unique([organizacaoId, chave])
 }

@@ -60,7 +60,8 @@ function configuracaoWebhook() {
     byEvents: false,
     // Fotos, áudios, vídeos e documentos chegam junto com a mensagem.
     base64: true,
-    events: ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],
+    // MESSAGES_UPDATE = avisos de entregue e lida (status das campanhas).
+    events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "CONNECTION_UPDATE"],
   };
 }
 
@@ -90,6 +91,13 @@ export async function garantirInstancia() {
   } else {
     await chamar("POST", `/webhook/set/${INSTANCIA}`, { webhook: configuracaoWebhook() });
   }
+}
+
+/** Atualiza o webhook da instância, se ela já existir (sem criar nada). */
+export async function garantirWebhook() {
+  if (simulandoEnvio() || !CHAVE) return;
+  if (!(await buscarInstancia())) return;
+  await chamar("POST", `/webhook/set/${INSTANCIA}`, { webhook: configuracaoWebhook() });
 }
 
 export async function estadoConexao(): Promise<{ estado: EstadoConexao; numero?: string; nome?: string }> {

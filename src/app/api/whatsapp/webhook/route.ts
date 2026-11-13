@@ -5,10 +5,12 @@
 // junto com a mensagem. Gravamos o arquivo (src/lib/arquivos.ts) e a mensagem
 // entra na conversa daquele número (src/lib/whatsapp/mensagens.ts).
 // Depois de responder à Evolution API, roda a automação (chatbot, aviso de fora
-// do horário, cancelamento de follow-ups): src/lib/automacao/ao-receber.ts.
+// do horário, cancelamento de follow-ups, SAIR das campanhas): src/lib/automacao/ao-receber.ts.
+// Avisos de entregue/lida (messages.update) atualizam as campanhas: src/lib/campanhas/status.ts.
 import { timingSafeEqual } from "node:crypto";
 import { after } from "next/server";
 import { aoReceberDoCliente } from "@/lib/automacao/ao-receber";
+import { registrarStatus } from "@/lib/campanhas/status";
 import { salvarArquivo } from "@/lib/arquivos";
 import { db } from "@/lib/db";
 import { getOrganizacaoPadrao } from "@/lib/org";
@@ -36,7 +38,9 @@ export async function POST(request: Request) {
   }
 
   const corpo = (await request.json().catch(() => null)) as { event?: string; instance?: string; data?: unknown } | null;
-  // Por enquanto só guardamos mensagens. O estado da conexão é consultado direto na tela do WhatsApp.
+  // Avisos de "entregue" e "lida": só interessam às campanhas (status de cada envio).
+  if (corpo?.event === "messages.update") return Response.json({ ok: true, atualizadas: await registrarStatus(corpo.data) });
+  // O estado da conexão é consultado direto na tela do WhatsApp.
   if (!corpo || corpo.event !== "messages.upsert") return Response.json({ ok: true });
 
   // Descobre a organização pela instância. Se não houver configuração, usa a organização padrão.
