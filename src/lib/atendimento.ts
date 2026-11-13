@@ -22,11 +22,25 @@ export function buscarConversa(eu: UsuarioAtual, id: string) {
   return db.conversa.findFirst({ where: { AND: [{ id }, conversasVisiveis(eu)] } });
 }
 
-/** Troca {nome}, {primeiro_nome} e {atendente} nas respostas rápidas. */
-export function preencherVariaveis(texto: string, valores: { nome?: string | null; atendente: string }) {
+/**
+ * Troca as variáveis dos textos prontos (respostas rápidas, chatbot, follow-up):
+ * {nome}, {primeiro_nome}, {atendente}, {empresa} e {horario}.
+ * "{, primeiro_nome}" vira ", Ana" — ou some, se não soubermos o nome.
+ */
+export function preencherVariaveis(
+  texto: string,
+  valores: { nome?: string | null; atendente?: string | null; empresa?: string; horario?: string },
+) {
   const nome = (valores.nome ?? "").trim();
+  const primeiro = nome.split(" ")[0] ?? "";
   return texto
+    .replace(/\{, ?(nome|primeiro_nome)\}/g, (_, v) => {
+      const valor = v === "nome" ? nome : primeiro;
+      return valor ? `, ${valor}` : "";
+    })
     .replaceAll("{nome}", nome)
-    .replaceAll("{primeiro_nome}", nome.split(" ")[0] ?? "")
-    .replaceAll("{atendente}", valores.atendente.split(" ")[0]);
+    .replaceAll("{primeiro_nome}", primeiro)
+    .replaceAll("{atendente}", (valores.atendente ?? "").split(" ")[0])
+    .replaceAll("{empresa}", valores.empresa ?? "")
+    .replaceAll("{horario}", valores.horario ?? "");
 }

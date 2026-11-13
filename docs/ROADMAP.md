@@ -72,6 +72,16 @@
   - [x] Contador de não lidas no menu e atualização automática a cada 5 s
   - [ ] Gravar áudio direto pelo CRM (hoje: anexar um arquivo de áudio)
   - [ ] Notas internas na conversa (visíveis só para a equipe)
-- [ ] Fase C: Automação (agendamento, follow-up, scripts, horário de atendimento, chatbot)
+- [x] Fase C: Automação
+  - [x] Horário de atendimento por dia da semana, com aviso automático fora do horário (1 vez a cada 12 h)
+  - [x] Chatbot de boas-vindas: menu numerado, etiqueta e atendente por opção, para quando uma pessoa assume
+  - [x] Agendar mensagem numa conversa (dia e hora), com opção de cancelar se o cliente responder
+  - [x] Sequências de follow-up (ex.: 1, 3 e 7 dias), canceladas sozinhas quando o cliente responde
+  - [x] Follow-ups respeitam o horário de atendimento
+  - [x] Fila de envios (o que vai sair, o que deu erro) e cancelamento
+  - [x] Relógio de envios dentro do próprio servidor (src/instrumentation.ts)
+  - [x] Modo simulação (WHATSAPP_SIMULAR_ENVIO=1) para testar sem enviar nada
+  - [ ] Gatilho pelo funil (ao mudar de etapa, iniciar uma sequência ou criar tarefa)
+  - [ ] Menu do chatbot com submenus
 - [ ] Fase D: Campanhas (disparos protegidos, reciclagem automática, status)
 - [ ] Fase E: Relatórios e integrações (por atendente, exportação, Google Agenda, webhooks)

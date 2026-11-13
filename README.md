@@ -57,6 +57,7 @@ Na primeira vez, abra http://localhost:3000. Como ninguém tem senha ainda, o CR
 | Painel | `/` | Valor no funil, vendas do mês, reciclagens a oferecer, tarefas, próximas turmas |
 | Atendimento | `/atendimento` | Central do WhatsApp: todas as conversas, fila e "minhas", fotos/áudios/documentos, respostas rápidas com "/", etiquetas, transferência entre atendentes, cadastro de cliente e funil sem sair da conversa |
 | Respostas e etiquetas | `/atendimento/respostas` | Textos prontos (da equipe ou só seus) e etiquetas das conversas |
+| Automação | `/automacao` | Horário de atendimento com aviso automático, chatbot de boas-vindas (menu), sequências de follow-up e a fila de mensagens agendadas |
 | Clientes | `/clientes` | Lista com busca, cadastro e ficha (contatos, negócios, certificados, histórico e tarefas, botão do WhatsApp) |
 | Funil de vendas | `/funil` | Kanban de arrastar e soltar (no celular, seletor "Mover para…"), criação de negócios |
 | Turmas | `/turmas` | Agenda, cadastro e edição; na turma: inscrição de alunos, presença, aprovação e emissão de certificados |

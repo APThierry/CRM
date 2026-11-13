@@ -12,6 +12,23 @@ export type EstadoConexao = "open" | "connecting" | "close" | "inexistente" | "e
 
 export class ErroWhatsapp extends Error {}
 
+/**
+ * Modo simulação (WHATSAPP_SIMULAR_ENVIO=1 no .env): nada sai para o WhatsApp.
+ * As mensagens são gravadas no CRM como se tivessem ido. Serve para testar
+ * chatbot, agendamentos e campanhas sem mandar mensagem para ninguém.
+ */
+export const simulandoEnvio = () => process.env.WHATSAPP_SIMULAR_ENVIO === "1";
+
+/** Envia de verdade, ou só finge (modo simulação). */
+async function enviar(caminho: string, corpo: Record<string, unknown>) {
+  if (simulandoEnvio()) {
+    console.log(`[whatsapp simulado] ${caminho} para ${String(corpo.number)}`);
+    return { idExterno: `simulado-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` };
+  }
+  const r = await chamar<{ key?: { id?: string } }>("POST", caminho, corpo);
+  return { idExterno: r.key?.id ?? null };
+}
+
 async function chamar<T>(metodo: "GET" | "POST" | "DELETE", caminho: string, corpo?: unknown): Promise<T> {
   let resposta: Response;
   try {
@@ -103,8 +120,7 @@ export async function desconectar() {
 
 /** Envia uma mensagem de texto. `numero` só com dígitos e DDI, ex.: 5531988887777. */
 export async function enviarTexto(numero: string, texto: string) {
-  const r = await chamar<{ key?: { id?: string } }>("POST", `/message/sendText/${INSTANCIA}`, { number: numero, text: texto });
-  return { idExterno: r.key?.id ?? null };
+  return enviar(`/message/sendText/${INSTANCIA}`, { number: numero, text: texto });
 }
 
 export type TipoMidia = "image" | "video" | "document";
@@ -114,7 +130,7 @@ export async function enviarMidia(
   numero: string,
   midia: { tipo: TipoMidia; base64: string; mimetype: string; nomeArquivo?: string; legenda?: string },
 ) {
-  const r = await chamar<{ key?: { id?: string } }>("POST", `/message/sendMedia/${INSTANCIA}`, {
+  return enviar(`/message/sendMedia/${INSTANCIA}`, {
     number: numero,
     mediatype: midia.tipo,
     mimetype: midia.mimetype,
@@ -122,14 +138,9 @@ export async function enviarMidia(
     fileName: midia.nomeArquivo,
     caption: midia.legenda || undefined,
   });
-  return { idExterno: r.key?.id ?? null };
 }
 
 /** Envia áudio como mensagem de voz (aparece como se tivesse sido gravado na hora). */
 export async function enviarAudio(numero: string, base64: string) {
-  const r = await chamar<{ key?: { id?: string } }>("POST", `/message/sendWhatsAppAudio/${INSTANCIA}`, {
-    number: numero,
-    audio: base64,
-  });
-  return { idExterno: r.key?.id ?? null };
+  return enviar(`/message/sendWhatsAppAudio/${INSTANCIA}`, { number: numero, audio: base64 });
 }

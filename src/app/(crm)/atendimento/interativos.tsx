@@ -2,7 +2,7 @@
 // Partes da Central de atendimento que rodam no navegador.
 import { useRouter } from "next/navigation";
 import { startTransition, useActionState, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { enviarMensagem, iniciarConversa, marcarLida } from "./actions";
+import { agendarNaConversa, enviarMensagem, iniciarConversa, iniciarSequenciaNaConversa, marcarLida, type ResultadoAgenda } from "./actions";
 
 /**
  * Busca mensagens novas a cada poucos segundos (só com a aba visível).
@@ -231,3 +231,57 @@ export function NovaConversa() {
     </form>
   );
 }
+
+// --- Agendamento e follow-up (painel da direita) ------------------------------
+
+function Aviso({ estado }: { estado: ResultadoAgenda }) {
+  if (estado?.erro) return <p className="rounded bg-red-50 p-1.5 text-xs text-red-700">{estado.erro}</p>;
+  if (estado?.ok) return <p className="rounded bg-green-50 p-1.5 text-xs text-green-700">{estado.ok}</p>;
+  return null;
+}
+
+/** Limpa o formulário depois de dar certo. */
+function useLimparAoConcluir(estado: ResultadoAgenda) {
+  const ref = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (estado?.ok) ref.current?.reset();
+  }, [estado]);
+  return ref;
+}
+
+export function FormSequencia({ conversaId, sequencias }: { conversaId: string; sequencias: { id: string; nome: string; passos: number }[] }) {
+  const [estado, acao, enviando] = useActionState(iniciarSequenciaNaConversa.bind(null, conversaId), null);
+  const ref = useLimparAoConcluir(estado);
+  return (
+    <form ref={ref} action={acao} className="space-y-1.5">
+      <div className="flex gap-1">
+        <select name="sequenciaId" required defaultValue="" aria-label="Sequência de follow-up" className="campo py-1 text-xs">
+          <option value="" disabled>Sequência…</option>
+          {sequencias.map((s) => (
+            <option key={s.id} value={s.id}>{s.nome} ({s.passos} msg)</option>
+          ))}
+        </select>
+        <button className="botao px-2 py-1 text-xs" disabled={enviando}>Iniciar</button>
+      </div>
+      <Aviso estado={estado} />
+    </form>
+  );
+}
+
+export function FormAgendar({ conversaId, sugestao }: { conversaId: string; sugestao: string }) {
+  const [estado, acao, enviando] = useActionState(agendarNaConversa.bind(null, conversaId), null);
+  const ref = useLimparAoConcluir(estado);
+  return (
+    <form ref={ref} action={acao} className="mt-2 space-y-1.5">
+      <textarea name="texto" required rows={3} placeholder="Mensagem (pode usar {primeiro_nome})" aria-label="Mensagem agendada" className="campo py-1 text-xs" />
+      <input type="datetime-local" name="enviarEm" required defaultValue={sugestao} aria-label="Dia e hora do envio" className="campo py-1 text-xs" />
+      <label className="flex items-center gap-1.5 text-[11px] text-slate-600">
+        <input type="checkbox" name="cancelarSeResponder" defaultChecked />
+        Não enviar se o cliente responder antes
+      </label>
+      <Aviso estado={estado} />
+      <button className="botao-secundario w-full py-1 text-xs" disabled={enviando}>⏰ Agendar</button>
+    </form>
+  );
+}
+

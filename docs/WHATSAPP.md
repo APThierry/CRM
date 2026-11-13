@@ -110,6 +110,28 @@ npm run dev             # 3. CRM (porta 3000)
 - **Número novo:** o painel da direita oferece **Cadastrar cliente** (já com o número) ou ligar a um cliente existente. Depois aparecem os negócios do cliente, com a etapa do funil para trocar ali mesmo.
 - **Atualização:** a tela busca novidades a cada 5 segundos enquanto está aberta.
 
+## Automação (menu Automação)
+
+Tudo começa **desligado**. Só administrador e gestor mudam as configurações.
+
+- **Horário de atendimento:** dias e horas de cada dia da semana. Com o aviso ligado, quem escreve fora do horário recebe a mensagem automática (no máximo uma vez a cada 12 horas por conversa). `{horario}` vira algo como "seg a sex, 08:00 às 18:00; sáb, 08:00 às 12:00".
+- **Chatbot de boas-vindas:** em conversa nova (ou parada há mais de X horas) e **na fila**, o bot manda a mensagem de boas-vindas com as opções numeradas. O cliente responde com o número (ou o começo do nome da opção). Cada opção pode responder um texto, colocar uma etiqueta e passar a conversa para um atendente. Resposta que o bot não entende: ele pergunta de novo uma vez; na segunda, avisa que um atendente vai continuar. Quando alguém responde ou clica em **Assumir**, o bot sai da conversa.
+- **Agendar mensagem:** no painel da direita da conversa, em *Follow-up e agendamento*. A mensagem sai assinada por quem agendou.
+- **Sequências de follow-up:** mensagens com tempo de espera (ex.: 1, 3 e 7 dias depois de iniciar). Iniciadas no painel da conversa. Se o cliente responder, o resto é cancelado. Com o horário de atendimento ligado, uma mensagem que cairia com a empresa fechada vai para a próxima abertura. Iniciar outra sequência na mesma conversa cancela a anterior.
+- **Fila de envios:** na tela Automação, o que ainda vai sair e o que deu erro (ex.: WhatsApp desconectado). Mensagens com erro não são reenviadas sozinhas.
+- **Mensagens automáticas** aparecem na conversa com "🤖 automática"; as agendadas, com o nome de quem agendou e "(agendada)".
+- **O relógio:** o próprio servidor do CRM confere a cada 30 segundos se há mensagem agendada vencida (`src/instrumentation.ts` liga o relógio). Com o CRM desligado, nada sai; quando ele volta, envia o que ficou atrasado.
+
+### Testar sem mandar mensagem para ninguém
+
+Crie o arquivo `.env.development.local` (vale só para o `npm run dev`) com:
+
+```
+WHATSAPP_SIMULAR_ENVIO="1"
+```
+
+Com isso, tudo que o CRM "enviaria" fica registrado na conversa, mas nada sai para o WhatsApp. A tela Automação mostra um aviso amarelo enquanto o modo simulação está ligado. Apague o arquivo (e reinicie o `npm run dev`) para voltar a enviar de verdade.
+
 ## Variáveis do CRM (`.env`)
 
 | Variável | Para quê |
@@ -120,6 +142,8 @@ npm run dev             # 3. CRM (porta 3000)
 | `WHATSAPP_WEBHOOK_URL` | Endereço que a Evolution chama para entregar mensagens |
 | `WHATSAPP_WEBHOOK_SEGREDO` | Segredo enviado no cabeçalho `x-crm-segredo`; o CRM recusa chamadas sem ele |
 | `ARQUIVOS_DIR` | Pasta das mídias (padrão: `../crm-arquivos`, fora do projeto). Faça backup dela junto com o banco |
+| `WHATSAPP_SIMULAR_ENVIO` | `1` = modo simulação: nada sai para o WhatsApp (só para testes) |
+| `AUTOMACAO_DESLIGADA` | `1` = não liga o relógio de envios agendados neste servidor |
 
 ## Onde fica o código
 
@@ -133,6 +157,9 @@ npm run dev             # 3. CRM (porta 3000)
 | `src/app/api/whatsapp/webhook/route.ts` | Recebe as mensagens (e a mídia) |
 | `src/app/api/arquivos/[...caminho]/route.ts` | Entrega as mídias só para quem está logado na organização |
 | `src/app/(crm)/atendimento/` | Central de atendimento (lista, conversa, painel) e Respostas e etiquetas |
+| `src/lib/automacao/` | Horário de atendimento, chatbot (`ao-receber.ts`), agendamento e o relógio de envios |
+| `src/instrumentation.ts` | Liga o relógio quando o servidor sobe |
+| `src/app/(crm)/automacao/` | Tela Automação |
 | `src/app/(crm)/whatsapp/` | Tela de conexão (QR Code) |
 | `src/app/(crm)/clientes/[id]/conversa-whatsapp.tsx` | Conversa na ficha do cliente |
 

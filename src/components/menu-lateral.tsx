@@ -20,6 +20,7 @@ const itens = [
   { href: "/turmas", rotulo: "Turmas", icone: "◷" },
   { href: "/certificados", rotulo: "Certificados", icone: "✎" },
   { href: "/cursos", rotulo: "Cursos", icone: "✚" },
+  { href: "/automacao", rotulo: "Automação", icone: "⚙" },
   { href: "/whatsapp", rotulo: "WhatsApp", icone: "✆" },
 ] as const;
 

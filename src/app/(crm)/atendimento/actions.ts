@@ -4,13 +4,16 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { getUsuarioAtual } from "@/lib/auth";
+import { agendarMensagem as agendar, iniciarSequencia as iniciar } from "@/lib/automacao/agendar";
+import { lerDataLocal } from "@/lib/automacao/horario";
 import { buscarConversa, veTodasConversas } from "@/lib/atendimento";
 import { db } from "@/lib/db";
 import { chaveTelefone, normalizarWhatsapp } from "@/lib/formatar";
 import { enviarNaConversa, type ResultadoEnvio } from "@/lib/whatsapp/enviar";
 import { obterConversa } from "@/lib/whatsapp/mensagens";
 
-const campo = (f: FormData, nome: string) => String(f.get(nome) ?? "").trim();
+// Textos de formulário chegam com "\r\n"; o WhatsApp usa só "\n".
+const campo = (f: FormData, nome: string) => String(f.get(nome) ?? "").replace(/\r\n?/g, "\n").trim();
 
 async function conversaPermitida(id: string) {
   const eu = await getUsuarioAtual();
@@ -57,7 +60,7 @@ export async function assumirConversa(conversaId: string) {
   if (conversa.atendenteId && conversa.atendenteId !== eu.id && !veTodasConversas(eu.papel)) {
     throw new Error("Esta conversa já tem atendente.");
   }
-  await db.conversa.update({ where: { id: conversa.id }, data: { atendenteId: eu.id, status: "ABERTA" } });
+  await db.conversa.update({ where: { id: conversa.id }, data: { atendenteId: eu.id, status: "ABERTA", botEtapa: null } });
   refresh();
 }
 
@@ -199,3 +202,41 @@ export async function criarNegocioDaConversa(conversaId: string, formData: FormD
   });
   refresh();
 }
+
+// --- Agendamento e follow-up (Fase C) ---------------------------------------
+
+export type ResultadoAgenda = { erro?: string; ok?: string } | null;
+
+export async function agendarNaConversa(conversaId: string, _estado: ResultadoAgenda, formData: FormData): Promise<ResultadoAgenda> {
+  const { eu, conversa } = await conversaPermitida(conversaId);
+  const texto = campo(formData, "texto");
+  const enviarEm = lerDataLocal(campo(formData, "enviarEm"));
+  if (!texto) return { erro: "Escreva a mensagem." };
+  if (!enviarEm) return { erro: "Escolha o dia e a hora." };
+  if (enviarEm.getTime() < Date.now() - 60_000) return { erro: "Esse horário já passou." };
+  if (enviarEm.getTime() > Date.now() + 366 * 86_400_000) return { erro: "Agende para no máximo um ano." };
+  await agendar(eu, conversa, { texto, enviarEm, cancelarSeResponder: formData.get("cancelarSeResponder") === "on" });
+  refresh();
+  return { ok: "Mensagem agendada." };
+}
+
+export async function iniciarSequenciaNaConversa(conversaId: string, _estado: ResultadoAgenda, formData: FormData): Promise<ResultadoAgenda> {
+  const { eu, conversa } = await conversaPermitida(conversaId);
+  const sequencia = await iniciar(eu, conversa, campo(formData, "sequenciaId"));
+  if (!sequencia) return { erro: "Escolha uma sequência (com pelo menos uma mensagem)." };
+  refresh();
+  return { ok: `Sequência "${sequencia.nome}" iniciada.` };
+}
+
+/** Cancela uma mensagem agendada (de uma conversa que a pessoa pode ver). */
+export async function cancelarAgendada(agendadaId: string) {
+  const eu = await getUsuarioAtual();
+  const a = await db.mensagemAgendada.findFirst({ where: { id: agendadaId, organizacaoId: eu.organizacao.id, status: "PENDENTE" } });
+  if (!a || !(await buscarConversa(eu, a.conversaId))) return;
+  await db.mensagemAgendada.updateMany({
+    where: { id: a.id, status: "PENDENTE" },
+    data: { status: "CANCELADA", motivo: `cancelada por ${eu.nome.split(" ")[0]}` },
+  });
+  refresh();
+}
+

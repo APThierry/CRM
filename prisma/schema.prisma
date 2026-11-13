@@ -44,6 +44,10 @@ model Organizacao {
   conversas     Conversa[]
   etiquetas     Etiqueta[]
   respostas     RespostaRapida[]
+  automacao     ConfiguracaoAutomacao?
+  opcoesBot     OpcaoBot[]
+  sequencias    Sequencia[]
+  agendadas     MensagemAgendada[]
 }
 
 enum Papel {
@@ -75,6 +79,8 @@ model Usuario {
   mensagens           MensagemWhatsapp[]
   conversas           Conversa[]
   respostas           RespostaRapida[]
+  opcoesBot           OpcaoBot[]
+  agendadas           MensagemAgendada[]
 
   @@index([organizacaoId])
 }
@@ -409,6 +415,11 @@ model Conversa {
   ultimaEm      DateTime         @default(now())
   ultimaTexto   String?
   ultimaDirecao DirecaoMensagem?
+  // Chatbot: "MENU" enquanto espera o cliente escolher uma opção.
+  botEtapa      String?
+  botTentativas Int              @default(0)
+  // Última vez que mandamos a mensagem de "fora do horário" (para não repetir).
+  foraHorarioEm DateTime?
   criadoEm      DateTime         @default(now())
 
   organizacao Organizacao        @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
@@ -417,6 +428,7 @@ model Conversa {
   atendente   Usuario?           @relation(fields: [atendenteId], references: [id], onDelete: SetNull)
   mensagens   MensagemWhatsapp[]
   etiquetas   Etiqueta[]
+  agendadas   MensagemAgendada[]
 
   @@unique([organizacaoId, chave])
   @@index([organizacaoId, status, ultimaEm])
@@ -433,6 +445,7 @@ model Etiqueta {
 
   organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
   conversas   Conversa[]
+  opcoesBot   OpcaoBot[]
 
   @@unique([organizacaoId, nome])
 }
@@ -479,4 +492,103 @@ model MensagemWhatsapp {
   @@index([organizacaoId, telefone])
   @@index([conversaId, criadoEm])
   @@index([clienteId])
+}
+
+// ---------------------------------------------------------------------------
+// Automação (Fase C): horário de atendimento, chatbot, agendamento e follow-up
+// ---------------------------------------------------------------------------
+
+// Uma por organização. Tudo começa DESLIGADO: quem liga é o gestor, na tela Automação.
+model ConfiguracaoAutomacao {
+  organizacaoId       String   @id
+  // Horário de atendimento
+  horarioAtivo        Boolean  @default(false)
+  // 7 itens (domingo = 0): { aberto, inicio: "08:00", fim: "18:00" }
+  horarios            Json
+  mensagemForaHorario String
+  // Chatbot de boas-vindas (menu de opções)
+  botAtivo            Boolean  @default(false)
+  botBoasVindas       String
+  // O bot só se apresenta em conversa nova ou parada há pelo menos estas horas.
+  botReativarHoras    Int      @default(24)
+  atualizadoEm        DateTime @updatedAt
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+}
+
+// Opção do menu do chatbot: o cliente responde com o número (ordem).
+model OpcaoBot {
+  id            String  @id @default(cuid())
+  organizacaoId String
+  ordem         Int
+  rotulo        String // "Orçamento de treinamento"
+  resposta      String? // o que o bot responde ao escolher
+  etiquetaId    String? // etiqueta colocada na conversa
+  atendenteId   String? // passa a conversa para esta pessoa (vazio = fila)
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  etiqueta    Etiqueta?   @relation(fields: [etiquetaId], references: [id], onDelete: SetNull)
+  atendente   Usuario?    @relation(fields: [atendenteId], references: [id], onDelete: SetNull)
+
+  @@index([organizacaoId, ordem])
+}
+
+// Sequência de follow-up: mensagens enviadas aos poucos até o cliente responder.
+model Sequencia {
+  id            String   @id @default(cuid())
+  organizacaoId String
+  nome          String
+  criadoEm      DateTime @default(now())
+
+  organizacao Organizacao        @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  passos      PassoSequencia[]
+  agendadas   MensagemAgendada[]
+
+  @@unique([organizacaoId, nome])
+}
+
+model PassoSequencia {
+  id            String @id @default(cuid())
+  sequenciaId   String
+  ordem         Int
+  // Minutos depois de iniciar a sequência (não do passo anterior).
+  esperaMinutos Int
+  texto         String
+
+  sequencia Sequencia @relation(fields: [sequenciaId], references: [id], onDelete: Cascade)
+
+  @@index([sequenciaId, ordem])
+}
+
+enum StatusAgendamento {
+  PENDENTE
+  ENVIANDO
+  ENVIADA
+  CANCELADA
+  ERRO
+}
+
+// Mensagem que o "relógio" (src/lib/automacao/relogio.ts) envia na hora marcada.
+model MensagemAgendada {
+  id                  String            @id @default(cuid())
+  organizacaoId       String
+  conversaId          String
+  usuarioId           String? // quem agendou (assina a mensagem); vazio = automática
+  sequenciaId         String?
+  texto               String
+  enviarEm            DateTime
+  // Follow-up: se o cliente responder antes, a mensagem não é enviada.
+  cancelarSeResponder Boolean           @default(true)
+  status              StatusAgendamento @default(PENDENTE)
+  motivo              String? // por que foi cancelada ou deu erro
+  enviadaEm           DateTime?
+  criadoEm            DateTime          @default(now())
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  conversa    Conversa    @relation(fields: [conversaId], references: [id], onDelete: Cascade)
+  usuario     Usuario?    @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  sequencia   Sequencia?  @relation(fields: [sequenciaId], references: [id], onDelete: SetNull)
+
+  @@index([status, enviarEm])
+  @@index([conversaId, status])
 }

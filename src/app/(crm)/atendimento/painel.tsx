@@ -5,15 +5,26 @@ import { conversasVisiveis } from "@/lib/atendimento";
 import { db } from "@/lib/db";
 import { moeda } from "@/lib/formatar";
 import { situacaoCertificado } from "@/lib/certificados";
+import { paraDataLocal } from "@/lib/automacao/horario";
 import { moverNegocioPeloFormulario } from "../funil/actions";
 import {
   alternarEtiqueta,
   cadastrarClienteDaConversa,
+  cancelarAgendada,
   criarNegocioDaConversa,
   desvincularCliente,
   vincularClienteExistente,
 } from "./actions";
-import { PainelLateral, SelectAutoEnvio } from "./interativos";
+import { FormAgendar, FormSequencia, PainelLateral, SelectAutoEnvio } from "./interativos";
+
+const quando = (d: Date) =>
+  d.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+/** Amanhã às 9h (horário de Brasília), para sugerir no agendamento. */
+function amanhaAsNove() {
+  const amanha = paraDataLocal(new Date(Date.now() + 86_400_000)).slice(0, 10);
+  return `${amanha}T09:00`;
+}
 
 export async function PainelDetalhes({ eu, conversaId }: { eu: UsuarioAtual; conversaId: string }) {
   const org = eu.organizacao.id;
@@ -37,11 +48,18 @@ export async function PainelDetalhes({ eu, conversaId }: { eu: UsuarioAtual; con
   });
   if (!conversa) return null;
 
-  const [etiquetas, etapas, servicos, clientes] = await Promise.all([
+  const [etiquetas, etapas, servicos, clientes, sequencias, agendadas] = await Promise.all([
     db.etiqueta.findMany({ where: { organizacaoId: org }, orderBy: { nome: "asc" } }),
     db.etapaFunil.findMany({ where: { organizacaoId: org }, orderBy: { ordem: "asc" } }),
     db.servico.findMany({ where: { organizacaoId: org, ativo: true }, orderBy: { nome: "asc" }, select: { id: true, nome: true } }),
     conversa.cliente ? [] : db.cliente.findMany({ where: { organizacaoId: org }, orderBy: { nome: "asc" }, select: { id: true, nome: true } }),
+    db.sequencia.findMany({ where: { organizacaoId: org }, orderBy: { nome: "asc" }, include: { _count: { select: { passos: true } } } }),
+    db.mensagemAgendada.findMany({
+      where: { conversaId: conversa.id, status: { in: ["PENDENTE", "ENVIANDO", "ERRO"] } },
+      orderBy: { enviarEm: "asc" },
+      take: 20,
+      include: { sequencia: { select: { nome: true } } },
+    }),
   ]);
   const marcadas = new Set(conversa.etiquetas.map((e) => e.id));
   const cliente = conversa.cliente;
@@ -163,6 +181,42 @@ export async function PainelDetalhes({ eu, conversaId }: { eu: UsuarioAtual; con
           </details>
         </Secao>
       )}
+
+      <Secao titulo="Follow-up e agendamento">
+        {agendadas.length > 0 && (
+          <ul className="mb-3 space-y-1.5">
+            {agendadas.map((a) => (
+              <li key={a.id} className={`rounded border p-2 text-xs ${a.status === "ERRO" ? "border-red-200 bg-red-50" : "border-slate-200"}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">
+                    {a.status === "ERRO" ? "⚠ não enviada" : `⏰ ${quando(a.enviarEm)}`}
+                    {a.sequencia && <span className="font-normal text-slate-500"> · {a.sequencia.nome}</span>}
+                  </span>
+                  {a.status === "PENDENTE" && (
+                    <form action={cancelarAgendada.bind(null, a.id)}>
+                      <button className="text-[11px] text-slate-500 underline hover:text-red-700">cancelar</button>
+                    </form>
+                  )}
+                </div>
+                <p className="mt-0.5 line-clamp-2 text-slate-600">{a.texto}</p>
+                {a.status === "ERRO" && a.motivo && <p className="mt-0.5 text-[11px] text-red-700">{a.motivo}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {sequencias.length > 0 ? (
+          <FormSequencia conversaId={conversa.id} sequencias={sequencias.map((s) => ({ id: s.id, nome: s.nome, passos: s._count.passos }))} />
+        ) : (
+          <p className="text-xs text-slate-500">
+            Nenhuma sequência de follow-up. <Link href="/automacao" className="underline">Criar em Automação</Link>
+          </p>
+        )}
+        <p className="mt-1 text-[11px] text-slate-500">As mensagens param sozinhas se o cliente responder.</p>
+        <details className="mt-2">
+          <summary className="cursor-pointer text-xs font-semibold text-marca-700">+ Agendar uma mensagem</summary>
+          <FormAgendar conversaId={conversa.id} sugestao={amanhaAsNove()} />
+        </details>
+      </Secao>
 
       <Secao titulo="Etiquetas">
         {etiquetas.length === 0 ? (

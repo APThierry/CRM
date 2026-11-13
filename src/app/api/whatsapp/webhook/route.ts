@@ -4,7 +4,11 @@
 // Com o webhook em modo "base64", fotos, áudios, vídeos e documentos chegam
 // junto com a mensagem. Gravamos o arquivo (src/lib/arquivos.ts) e a mensagem
 // entra na conversa daquele número (src/lib/whatsapp/mensagens.ts).
+// Depois de responder à Evolution API, roda a automação (chatbot, aviso de fora
+// do horário, cancelamento de follow-ups): src/lib/automacao/ao-receber.ts.
 import { timingSafeEqual } from "node:crypto";
+import { after } from "next/server";
+import { aoReceberDoCliente } from "@/lib/automacao/ao-receber";
 import { salvarArquivo } from "@/lib/arquivos";
 import { db } from "@/lib/db";
 import { getOrganizacaoPadrao } from "@/lib/org";
@@ -69,7 +73,7 @@ export async function POST(request: Request) {
 
     const quando = Number(m.messageTimestamp);
     const doCelularDaEmpresa = Boolean(m.key?.fromMe);
-    const { nova } = await registrarMensagem({
+    const { nova, conversa } = await registrarMensagem({
       organizacaoId,
       telefone: jid.split("@")[0],
       // fromMe = mensagem enviada pelo celular da empresa (fora do CRM)
@@ -86,6 +90,11 @@ export async function POST(request: Request) {
       doCliente: !doCelularDaEmpresa,
     });
     if (nova) salvas++;
+
+    if (nova && conversa && !doCelularDaEmpresa) {
+      const recebida = { conversa, tipo: lida.tipo, conteudo: lida.conteudo, criadoEm: quando ? new Date(quando * 1000) : new Date() };
+      after(() => aoReceberDoCliente(recebida).catch((e) => console.error("[automação] falhou:", e)));
+    }
   }
 
   return Response.json({ ok: true, salvas });

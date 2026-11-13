@@ -64,6 +64,7 @@ export async function PainelConversa({ eu, conversaId, filtros }: { eu: UsuarioA
           <div className="text-xs text-slate-500">
             {telefone(conversa.telefone)}
             {conversa.status === "FINALIZADA" && <span className="ml-2 font-medium text-slate-600">· finalizada</span>}
+            {conversa.botEtapa === "MENU" && <span className="ml-2 text-marca-700">· 🤖 chatbot esperando a escolha</span>}
           </div>
         </div>
 
@@ -167,7 +168,14 @@ function Balao({ m, autor }: { m: MensagemWhatsapp; autor: string | null }) {
         {!url && m.tipo !== "TEXTO" && m.tipo !== "OUTRO" && <span className="text-xs italic text-slate-500">(arquivo não disponível) </span>}
         {(!url || !legendaPadrao) && <p className="whitespace-pre-wrap break-words">{m.conteudo}</p>}
         <div className="mt-0.5 text-right text-[10px] text-slate-500">
-          {saida && (autor ? `${autor.split(" ")[0]} · ` : m.status === "enviada pelo celular" ? "pelo celular · " : "")}
+          {saida &&
+            (autor
+              ? `${autor.split(" ")[0]}${m.status === "agendada" ? " (agendada)" : ""} · `
+              : m.status === "enviada pelo celular"
+                ? "pelo celular · "
+                : m.status === "automática"
+                  ? "🤖 automática · "
+                  : "")}
           {hora(m.criadoEm)}
           {m.status === "erro" && <span className="ml-1 text-red-600">falhou</span>}
         </div>

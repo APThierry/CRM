@@ -78,9 +78,33 @@ export async function enviarNaConversa(
   // Quem responde "puxa" a conversa da fila e zera as não lidas.
   await db.conversa.update({
     where: { id: conversa.id },
-    data: { naoLidas: 0, status: "ABERTA", ...(conversa.atendenteId ? {} : { atendenteId: eu.id }) },
+    // Uma pessoa respondeu: o chatbot sai de cena.
+    data: { naoLidas: 0, status: "ABERTA", botEtapa: null, ...(conversa.atendenteId ? {} : { atendenteId: eu.id }) },
   });
   return { ok: true };
+}
+
+/**
+ * Envio feito pelo próprio CRM (chatbot, horário de atendimento, agendamentos).
+ * Com `autor`, a mensagem sai assinada por ele (agendada por uma pessoa); sem
+ * autor, sai como "automática". Não mexe no atendente nem nas não lidas.
+ * Lança ErroWhatsapp se a Evolution API recusar.
+ */
+export async function enviarAutomatico(
+  conversa: Pick<Conversa, "organizacaoId" | "telefone">,
+  texto: string,
+  autor?: Pick<UsuarioAtual, "id" | "nome" | "assinaturaWhatsapp"> | null,
+) {
+  const { idExterno } = await enviarTexto(conversa.telefone, autor ? assinar(autor, texto) : texto);
+  await registrarMensagem({
+    organizacaoId: conversa.organizacaoId,
+    telefone: conversa.telefone,
+    direcao: "SAIDA",
+    conteudo: texto,
+    status: autor ? "agendada" : "automática",
+    idExterno,
+    usuarioId: autor?.id ?? null,
+  });
 }
 
 async function enviarSoTexto(eu: UsuarioAtual, conversa: Pick<Conversa, "organizacaoId" | "telefone">, texto: string) {

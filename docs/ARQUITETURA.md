@@ -75,6 +75,7 @@ scripts/
   banco-local.mjs      PostgreSQL local para desenvolvimento (npm run db:local)
 src/
   proxy.ts             checagem rápida: sem cookie de sessão -> /login
+  instrumentation.ts   roda quando o servidor sobe: liga o relógio da automação
   app/                 páginas e rotas (cada pasta vira uma URL)
     (publico)/login/   entrar, sair e primeiro acesso (sem menu)
     (crm)/             páginas que exigem login (layout com menu)
@@ -84,6 +85,7 @@ src/
     (crm)/atendimento/ Central de atendimento: page.tsx junta lista.tsx, conversa.tsx e
                        painel.tsx; interativos.tsx roda no navegador; respostas/ = respostas
                        rápidas e etiquetas
+    (crm)/automacao/   horário de atendimento, chatbot, sequências de follow-up e fila de envios
     (crm)/whatsapp/    conexão do número (QR Code)
     (crm)/clientes/    lista, novo, ficha [id] e actions.ts (gravações)
     (crm)/funil/       Kanban (kanban.tsx roda no navegador) e actions.ts
@@ -104,6 +106,8 @@ src/
     atendimento.ts     quem vê qual conversa (vendedor x gestor)
     arquivos.ts        mídias do WhatsApp em ARQUIVOS_DIR (fora do projeto)
     whatsapp/          Evolution API, conversas/mensagens e envio
+    automacao/         horario.ts (contas de horário), ao-receber.ts (chatbot e aviso),
+                       agendar.ts (agendamentos e sequências), relogio.ts (envia na hora)
   generated/prisma/    código gerado pelo Prisma (não editar, não vai para o Git)
 docs/                  esta documentação
 ```
@@ -125,6 +129,7 @@ docs/                  esta documentação
 - **Webhook do WhatsApp** fica fora do login (tem o próprio segredo) e usa `getOrganizacaoPadrao()`.
 - **Central de atendimento:** `conversasVisiveis(eu)` (em `src/lib/atendimento.ts`) é o filtro usado em toda consulta e action de conversa. Vendedor e instrutor: fila + as suas. Gestor e admin: todas.
 - **Mídias:** a rota `/api/arquivos/...` exige sessão e só lê arquivos da pasta da organização do usuário (recusa `..`).
+- **Automação:** o webhook grava a mensagem, responde à Evolution API e só depois (com `after()`) roda o chatbot e o aviso de fora do horário. O relógio (`src/lib/automacao/relogio.ts`) roda dentro do servidor a cada 30 s; cada mensagem agendada é "reservada" (PENDENTE → ENVIANDO) antes de sair, para nunca ser enviada duas vezes. Rode **um** processo do CRM (ou use `AUTOMACAO_DESLIGADA=1` nos outros).
 
 ## Pastas fora do projeto
 
