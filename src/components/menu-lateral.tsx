@@ -14,6 +14,7 @@ import { Suspense, useState } from "react";
 
 const itens = [
   { href: "/", rotulo: "Painel", icone: "▦" },
+  { href: "/atendimento", rotulo: "Atendimento", icone: "✉" },
   { href: "/clientes", rotulo: "Clientes", icone: "◉" },
   { href: "/funil", rotulo: "Funil de vendas", icone: "▤" },
   { href: "/turmas", rotulo: "Turmas", icone: "◷" },
@@ -22,8 +23,9 @@ const itens = [
   { href: "/whatsapp", rotulo: "WhatsApp", icone: "✆" },
 ] as const;
 
-// `usuario` chega pronto do servidor (Server Component dentro de Suspense).
-export function MenuLateral({ usuario }: { usuario?: React.ReactNode }) {
+// `usuario` e `contador` chegam prontos do servidor (Server Components dentro de Suspense).
+// `contador` é o número de conversas com mensagens não lidas, ao lado de "Atendimento".
+export function MenuLateral({ usuario, contador }: { usuario?: React.ReactNode; contador?: React.ReactNode }) {
   const [aberto, setAberto] = useState(false);
   return (
     <aside className="sticky top-0 z-30 flex shrink-0 flex-col bg-marca-900 text-marca-50 print:hidden! md:h-screen md:w-56">
@@ -51,8 +53,8 @@ export function MenuLateral({ usuario }: { usuario?: React.ReactNode }) {
         }}
       >
         <nav className="flex flex-col gap-1 px-3">
-          <Suspense fallback={<Itens caminho={null} />}>
-            <ItensComDestaque />
+          <Suspense fallback={<Itens caminho={null} contador={contador} />}>
+            <ItensComDestaque contador={contador} />
           </Suspense>
         </nav>
         {usuario && <div className="mt-4 border-t border-white/10 px-5 py-4 md:mt-auto">{usuario}</div>}
@@ -61,11 +63,11 @@ export function MenuLateral({ usuario }: { usuario?: React.ReactNode }) {
   );
 }
 
-function ItensComDestaque() {
-  return <Itens caminho={usePathname()} />;
+function ItensComDestaque({ contador }: { contador?: React.ReactNode }) {
+  return <Itens caminho={usePathname()} contador={contador} />;
 }
 
-function Itens({ caminho }: { caminho: string | null }) {
+function Itens({ caminho, contador }: { caminho: string | null; contador?: React.ReactNode }) {
   const ativo = (href: string) => caminho !== null && (href === "/" ? caminho === "/" : caminho.startsWith(href));
   return itens.map((item) => (
     <Link
@@ -77,6 +79,7 @@ function Itens({ caminho }: { caminho: string | null }) {
     >
       <span aria-hidden className="w-4 text-center">{item.icone}</span>
       {item.rotulo}
+      {item.href === "/atendimento" && contador}
     </Link>
   ));
 }

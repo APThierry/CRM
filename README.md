@@ -55,11 +55,13 @@ Na primeira vez, abra http://localhost:3000. Como ninguém tem senha ainda, o CR
 | Tela | Endereço | O que faz |
 |---|---|---|
 | Painel | `/` | Valor no funil, vendas do mês, reciclagens a oferecer, tarefas, próximas turmas |
+| Atendimento | `/atendimento` | Central do WhatsApp: todas as conversas, fila e "minhas", fotos/áudios/documentos, respostas rápidas com "/", etiquetas, transferência entre atendentes, cadastro de cliente e funil sem sair da conversa |
+| Respostas e etiquetas | `/atendimento/respostas` | Textos prontos (da equipe ou só seus) e etiquetas das conversas |
 | Clientes | `/clientes` | Lista com busca, cadastro e ficha (contatos, negócios, certificados, histórico e tarefas, botão do WhatsApp) |
-| Funil de vendas | `/funil` | Kanban de arrastar e soltar, criação de negócios |
+| Funil de vendas | `/funil` | Kanban de arrastar e soltar (no celular, seletor "Mover para…"), criação de negócios |
 | Turmas | `/turmas` | Agenda, cadastro e edição; na turma: inscrição de alunos, presença, aprovação e emissão de certificados |
 | Certificados | `/certificados` | Todos os certificados, filtro válido/vencendo/vencido, busca e impressão (PDF) |
-| WhatsApp | `/whatsapp` | Conexão do número por QR Code e conversas recentes; a conversa com cada cliente fica na ficha dele |
+| WhatsApp | `/whatsapp` | Conexão do número por QR Code e resumo das conversas |
 | Usuários | `/usuarios` | Cadastro da equipe, papéis, desativar e redefinir senha (só administrador) |
 | Meu perfil | `/perfil` | Nome, senha e assinatura no WhatsApp |
 | Cursos | `/cursos` | Os 9 cursos da Brigada MG (somente leitura por enquanto) |

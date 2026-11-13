@@ -81,11 +81,17 @@ src/
     (crm)/page.tsx     painel (/)
     (crm)/usuarios/    gestão de usuários (admin) + formulários do perfil
     (crm)/perfil/      meu perfil
-    clientes/          lista, novo, ficha [id] e actions.ts (gravações)
-    funil/             Kanban (kanban.tsx roda no navegador) e actions.ts
-    turmas/            lista, nova, [id] (alunos e certificados), [id]/editar e actions.ts
-    certificados/      lista com filtros e [id] (certificado para imprimir)
-    cursos/            lista
+    (crm)/atendimento/ Central de atendimento: page.tsx junta lista.tsx, conversa.tsx e
+                       painel.tsx; interativos.tsx roda no navegador; respostas/ = respostas
+                       rápidas e etiquetas
+    (crm)/whatsapp/    conexão do número (QR Code)
+    (crm)/clientes/    lista, novo, ficha [id] e actions.ts (gravações)
+    (crm)/funil/       Kanban (kanban.tsx roda no navegador) e actions.ts
+    (crm)/turmas/      lista, nova, [id] (alunos e certificados), [id]/editar e actions.ts
+    (crm)/certificados/ lista com filtros e [id] (certificado para imprimir)
+    (crm)/cursos/      lista
+    api/whatsapp/webhook/  recebe as mensagens da Evolution API
+    api/arquivos/      entrega as mídias (confere o login)
   components/          peças visuais reutilizadas (menu, cabeçalho, etiquetas)
   lib/
     db.ts              conexão com o banco
@@ -95,6 +101,9 @@ src/
     org.ts             organização do usuário logado; organização padrão para o webhook
     formatar.ts        moeda, datas, CPF, telefone e link do WhatsApp
     certificados.ts    validade, numeração e situação dos certificados
+    atendimento.ts     quem vê qual conversa (vendedor x gestor)
+    arquivos.ts        mídias do WhatsApp em ARQUIVOS_DIR (fora do projeto)
+    whatsapp/          Evolution API, conversas/mensagens e envio
   generated/prisma/    código gerado pelo Prisma (não editar, não vai para o Git)
 docs/                  esta documentação
 ```
@@ -114,3 +123,16 @@ docs/                  esta documentação
 - **Ações restritas** usam `exigirPapel("ADMIN")`.
 - **Sessão:** o cookie `crm_sessao` guarda um código aleatório; a tabela `Sessao` guarda só o SHA-256 dele. Desativar um usuário ou redefinir a senha apaga as sessões, desconectando na hora.
 - **Webhook do WhatsApp** fica fora do login (tem o próprio segredo) e usa `getOrganizacaoPadrao()`.
+- **Central de atendimento:** `conversasVisiveis(eu)` (em `src/lib/atendimento.ts`) é o filtro usado em toda consulta e action de conversa. Vendedor e instrutor: fila + as suas. Gestor e admin: todas.
+- **Mídias:** a rota `/api/arquivos/...` exige sessão e só lê arquivos da pasta da organização do usuário (recusa `..`).
+
+## Pastas fora do projeto
+
+O `next dev` observa a pasta do projeto: qualquer arquivo gravado ali dentro faz a página recarregar. Por isso o que muda o tempo todo fica **ao lado** do projeto:
+
+| Pasta | O que guarda |
+|---|---|
+| `../crm-banco-local` | Banco PostgreSQL local (`npm run db:local`) |
+| `../crm-arquivos` | Fotos, áudios e documentos do WhatsApp (`ARQUIVOS_DIR`) |
+
+O cache em disco do Turbopack também está desligado no desenvolvimento (`turbopackFileSystemCacheForDev: false` em `next.config.ts`): com ele, depois de um tempo a página aberta entrava num ciclo de recarregar.

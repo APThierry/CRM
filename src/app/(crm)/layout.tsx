@@ -2,12 +2,17 @@
 // barra no topo no celular) + conteúdo.
 import { Suspense } from "react";
 import { MenuLateral } from "@/components/menu-lateral";
-import { UsuarioNoMenu } from "@/components/usuario-no-menu";
+import { ContadorAtendimento, UsuarioNoMenu } from "@/components/usuario-no-menu";
 
 export default function LayoutCrm({ children }: LayoutProps<"/">) {
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <MenuLateral
+        contador={
+          <Suspense fallback={null}>
+            <ContadorAtendimento />
+          </Suspense>
+        }
         usuario={
           <Suspense fallback={<div className="h-14" />}>
             <UsuarioNoMenu />

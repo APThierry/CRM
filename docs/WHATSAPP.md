@@ -90,11 +90,25 @@ npm run dev             # 3. CRM (porta 3000)
 
 ## Como usar
 
-- **Ficha do cliente → 💬 WhatsApp:** conversa com o cliente, envio de mensagens e modelos prontos. A conversa se atualiza a cada 10 segundos.
-- **Tela WhatsApp:** as últimas conversas, inclusive de números **não cadastrados** (novos interessados).
+- **Atendimento** (menu): a Central com todas as conversas. Veja "Central de atendimento" abaixo.
+- **Ficha do cliente → 💬 WhatsApp:** a mesma conversa, vista a partir do cliente.
+- **Tela WhatsApp:** só a conexão do número e um resumo (abertas, na fila, não lidas).
 - Mensagens enviadas **pelo celular** também aparecem no CRM (com a marca "pelo celular").
 - O CRM reconhece o cliente pelo número mesmo sem o nono dígito: compara DDD + 8 últimos dígitos.
 - Grupos e status são ignorados.
+
+## Central de atendimento
+
+- **Uma conversa por número.** O CRM junta as mensagens pelo DDD + 8 últimos dígitos, então o nono dígito não cria conversas duplicadas.
+- **Abas:** *Abertas* (tudo que você pode ver), *Minhas* (você é o atendente), *Fila* (ninguém assumiu ainda) e *Finalizadas*.
+- **Quem atende:** quem responde uma conversa da fila (ou clica em **Assumir**) vira o atendente dela. Gestor e administrador podem transferir qualquer conversa; o atendente pode transferir as dele ou devolver para a fila.
+- **Quem vê o quê:** vendedor/atendente e instrutor veem a fila e as próprias conversas. Gestor e administrador veem todas.
+- **Finalizar** tira a conversa das abertas. Se o cliente escrever de novo, ela volta sozinha, com o mesmo atendente.
+- **Mídia:** fotos, vídeos, áudios e documentos chegam junto com a mensagem (webhook com `base64` ligado) e ficam na pasta `ARQUIVOS_DIR`. Para enviar, use o 📎 (até 16 MB). Áudio vai como mensagem de voz.
+- **Respostas rápidas:** digite `/` na caixa de mensagem. Use `{primeiro_nome}`, `{nome}` e `{atendente}` no texto. Cadastro em **Atendimento → Respostas e etiquetas**.
+- **Etiquetas:** clique na etiqueta no painel da direita para marcar ou desmarcar. Filtro na lista. Só gestor e administrador criam e apagam etiquetas.
+- **Número novo:** o painel da direita oferece **Cadastrar cliente** (já com o número) ou ligar a um cliente existente. Depois aparecem os negócios do cliente, com a etapa do funil para trocar ali mesmo.
+- **Atualização:** a tela busca novidades a cada 5 segundos enquanto está aberta.
 
 ## Variáveis do CRM (`.env`)
 
@@ -105,19 +119,26 @@ npm run dev             # 3. CRM (porta 3000)
 | `EVOLUTION_INSTANCIA` | Nome da conexão (uma por organização) |
 | `WHATSAPP_WEBHOOK_URL` | Endereço que a Evolution chama para entregar mensagens |
 | `WHATSAPP_WEBHOOK_SEGREDO` | Segredo enviado no cabeçalho `x-crm-segredo`; o CRM recusa chamadas sem ele |
+| `ARQUIVOS_DIR` | Pasta das mídias (padrão: `../crm-arquivos`, fora do projeto). Faça backup dela junto com o banco |
 
 ## Onde fica o código
 
 | Arquivo | O que faz |
 |---|---|
 | `src/lib/whatsapp/evolution.ts` | Única parte que fala com a Evolution API (trocar de provedor = mudar só aqui) |
-| `src/lib/whatsapp/mensagens.ts` | Encontra o cliente pelo telefone e extrai o texto das mensagens |
-| `src/app/api/whatsapp/webhook/route.ts` | Recebe as mensagens |
-| `src/app/whatsapp/` | Tela de conexão (QR Code) e ações de envio |
-| `src/app/clientes/[id]/conversa-whatsapp.tsx` | Conversa na ficha do cliente |
+| `src/lib/whatsapp/mensagens.ts` | Conversas: encontra o cliente pelo telefone, entende o tipo da mensagem e grava na conversa certa |
+| `src/lib/whatsapp/enviar.ts` | Envio de texto e mídia (com assinatura); usado pela Central e pela ficha do cliente |
+| `src/lib/atendimento.ts` | Quem vê qual conversa e variáveis das respostas rápidas |
+| `src/lib/arquivos.ts` | Grava e lê as mídias em `ARQUIVOS_DIR` |
+| `src/app/api/whatsapp/webhook/route.ts` | Recebe as mensagens (e a mídia) |
+| `src/app/api/arquivos/[...caminho]/route.ts` | Entrega as mídias só para quem está logado na organização |
+| `src/app/(crm)/atendimento/` | Central de atendimento (lista, conversa, painel) e Respostas e etiquetas |
+| `src/app/(crm)/whatsapp/` | Tela de conexão (QR Code) |
+| `src/app/(crm)/clientes/[id]/conversa-whatsapp.tsx` | Conversa na ficha do cliente |
 
 ## Limitações atuais
 
-- Só texto é enviado. Recebidos de mídia aparecem como "📷 Imagem", "🎤 Áudio" etc., sem o arquivo.
+- Mídias recebidas **antes** da Fase B (12/11/2026) não têm o arquivo, só a descrição ("📷 Imagem").
+- Ainda não dá para gravar áudio direto no CRM: anexe um arquivo de áudio.
 - Sem envio em massa (de propósito, por causa do risco de banimento).
 - Na VPS, o webhook vai usar o endereço interno do Docker. Isso entra no guia de deploy.

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { sair } from "@/app/(publico)/login/actions";
 import { getUsuarioAtual, nomesPapel, podeGerenciarUsuarios } from "@/lib/auth";
+import { conversasVisiveis } from "@/lib/atendimento";
+import { db } from "@/lib/db";
 
 export async function UsuarioNoMenu() {
   await connection();
@@ -35,5 +37,18 @@ export async function UsuarioNoMenu() {
         </form>
       </div>
     </div>
+  );
+}
+
+/** Bolinha verde ao lado de "Atendimento": conversas com mensagens não lidas que a pessoa pode ver. */
+export async function ContadorAtendimento() {
+  await connection();
+  const eu = await getUsuarioAtual();
+  const n = await db.conversa.count({ where: { AND: [conversasVisiveis(eu), { naoLidas: { gt: 0 } }] } });
+  if (n === 0) return null;
+  return (
+    <span className="ml-auto rounded-full bg-green-500 px-1.5 text-[11px] font-bold text-white" aria-label={`${n} conversa(s) não lida(s)`}>
+      {n}
+    </span>
   );
 }

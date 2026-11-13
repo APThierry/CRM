@@ -5,6 +5,7 @@
 // valores de referência e precisam ser conferidos com a Brigada.
 // Os clientes, contatos e negócios são FICTÍCIOS.
 import "dotenv/config";
+import { ETIQUETAS_PADRAO, RESPOSTAS_PADRAO } from "../src/lib/padroes-atendimento";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, type Cliente, type Contato, type EtapaFunil, type Servico } from "../src/generated/prisma/client";
 
@@ -251,6 +252,10 @@ async function main() {
       { organizacaoId, tipo: "NOTA", descricao: "Certificados da brigada vencem no próximo mês. Oferecer reciclagem.", clienteId: cliente("Supermercado").id, usuarioId: admin.id },
     ],
   });
+
+  // Central de atendimento: etiquetas e respostas rápidas para começar.
+  await db.etiqueta.createMany({ data: ETIQUETAS_PADRAO.map((e) => ({ ...e, organizacaoId })) });
+  await db.respostaRapida.createMany({ data: RESPOSTAS_PADRAO.map((r) => ({ ...r, organizacaoId })) });
 
   console.log(`Seed concluído: ${clientes.length} clientes, ${cursos.length} cursos, ${negociosDados.length} negócios.`);
 }

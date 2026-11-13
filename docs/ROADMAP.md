@@ -60,7 +60,18 @@
 
 ## Plano "melhor que o Waseller"
 - [x] Fase A: Login e atendentes
-- [ ] Fase B: Central de atendimento (caixa de entrada única, mídia, etiquetas, respostas rápidas, atribuição)
+- [x] Fase B: Central de atendimento
+  - [x] Caixa de entrada única, com abas Abertas / Minhas / Fila / Finalizadas e busca
+  - [x] Receber e enviar foto, vídeo, áudio e documento
+  - [x] Respostas rápidas com "/" e variáveis ({primeiro_nome}, {atendente})
+  - [x] Etiquetas coloridas e filtro por etiqueta
+  - [x] Fila e atribuição: quem responde fica com a conversa; gestor transfere
+  - [x] Vendedor vê só a fila e as conversas dele; gestor e admin veem tudo
+  - [x] Cadastrar cliente ou ligar a um cliente existente pela conversa
+  - [x] Criar negócio e mudar a etapa do funil pela conversa (e pelo celular no Kanban)
+  - [x] Contador de não lidas no menu e atualização automática a cada 5 s
+  - [ ] Gravar áudio direto pelo CRM (hoje: anexar um arquivo de áudio)
+  - [ ] Notas internas na conversa (visíveis só para a equipe)
 - [ ] Fase C: Automação (agendamento, follow-up, scripts, horário de atendimento, chatbot)
 - [ ] Fase D: Campanhas (disparos protegidos, reciclagem automática, status)
 - [ ] Fase E: Relatórios e integrações (por atendente, exportação, Google Agenda, webhooks)

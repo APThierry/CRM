@@ -1,6 +1,8 @@
 "use client";
 // Quadro Kanban. Roda no navegador (Client Component) porque precisa de
 // arrastar e soltar. Ao soltar um cartão, chama a Server Action `moverNegocio`.
+// Em telas de toque (celular, tablet) o arrastar não funciona: cada cartão tem
+// um seletor "Mover para…" que faz a mesma coisa.
 import Link from "next/link";
 import { useOptimistic, useTransition, useState } from "react";
 import { moverNegocio } from "./actions";
@@ -26,16 +28,19 @@ export function Kanban({ etapas, negocios }: { etapas: EtapaKanban[]; negocios: 
   const [, iniciar] = useTransition();
   const [colunaSobre, setColunaSobre] = useState<string | null>(null);
 
-  function soltar(etapaId: string, e: React.DragEvent) {
-    e.preventDefault();
-    setColunaSobre(null);
-    const id = e.dataTransfer.getData("text/plain");
+  function mover(id: string, etapaId: string) {
     const negocio = lista.find((n) => n.id === id);
     if (!negocio || negocio.etapaId === etapaId) return;
     iniciar(async () => {
       moverOtimista({ id, etapaId });
       await moverNegocio(id, etapaId);
     });
+  }
+
+  function soltar(etapaId: string, e: React.DragEvent) {
+    e.preventDefault();
+    setColunaSobre(null);
+    mover(e.dataTransfer.getData("text/plain"), etapaId);
   }
 
   return (
@@ -80,6 +85,18 @@ export function Kanban({ etapas, negocios }: { etapas: EtapaKanban[]; negocios: 
                     <span className="font-semibold text-slate-700">{moeda.format(n.valor)}</span>
                     {n.quantidadeAlunos && <span className="text-slate-500">{n.quantidadeAlunos} alunos</span>}
                   </div>
+                  <select
+                    value={n.etapaId}
+                    onChange={(e) => mover(n.id, e.target.value)}
+                    aria-label={`Mover ${n.titulo} para outra etapa`}
+                    className="campo mt-2 py-1 text-xs lg:hidden"
+                  >
+                    {etapas.map((et) => (
+                      <option key={et.id} value={et.id}>
+                        {et.id === n.etapaId ? `Etapa: ${et.nome}` : `Mover para ${et.nome}`}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               ))}
             </div>

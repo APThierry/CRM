@@ -24,6 +24,11 @@ export async function moverNegocio(negocioId: string, etapaId: string) {
   refresh();
 }
 
+/** Mesma coisa, a partir de um <select> (celular e Central de atendimento). */
+export async function moverNegocioPeloFormulario(negocioId: string, formData: FormData) {
+  await moverNegocio(negocioId, String(formData.get("etapaId") ?? ""));
+}
+
 export async function criarNegocio(formData: FormData) {
   const eu = await getUsuarioAtual();
   const org = eu.organizacao;

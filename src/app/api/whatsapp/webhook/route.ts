@@ -1,9 +1,14 @@
 // Webhook: a Evolution API chama este endereço a cada mensagem do WhatsApp.
 // POST /api/whatsapp/webhook
+//
+// Com o webhook em modo "base64", fotos, áudios, vídeos e documentos chegam
+// junto com a mensagem. Gravamos o arquivo (src/lib/arquivos.ts) e a mensagem
+// entra na conversa daquele número (src/lib/whatsapp/mensagens.ts).
 import { timingSafeEqual } from "node:crypto";
+import { salvarArquivo } from "@/lib/arquivos";
 import { db } from "@/lib/db";
 import { getOrganizacaoPadrao } from "@/lib/org";
-import { encontrarPorTelefone, textoDaMensagem, type ConteudoWhatsapp } from "@/lib/whatsapp/mensagens";
+import { interpretarMensagem, registrarMensagem, type ConteudoWhatsapp } from "@/lib/whatsapp/mensagens";
 
 type MensagemRecebida = {
   key?: { id?: string; remoteJid?: string; remoteJidAlt?: string; fromMe?: boolean };
@@ -30,7 +35,7 @@ export async function POST(request: Request) {
   // Por enquanto só guardamos mensagens. O estado da conexão é consultado direto na tela do WhatsApp.
   if (!corpo || corpo.event !== "messages.upsert") return Response.json({ ok: true });
 
-  // Descobre a organização pela instância. Se não houver configuração, usa a organização atual.
+  // Descobre a organização pela instância. Se não houver configuração, usa a organização padrão.
   const config = corpo.instance
     ? await db.configuracaoWhatsapp.findFirst({ where: { instancia: corpo.instance } })
     : null;
@@ -44,31 +49,43 @@ export async function POST(request: Request) {
     // Ignora grupos, status e listas de transmissão.
     if (!jid || !jid.endsWith("@s.whatsapp.net")) continue;
 
-    const conteudo = textoDaMensagem(m.message);
-    if (!conteudo) continue;
+    const lida = interpretarMensagem(m.message);
+    if (!lida) continue;
 
     const idExterno = m.key?.id ?? null;
-    if (idExterno && (await db.mensagemWhatsapp.findFirst({ where: { organizacaoId, idExterno } }))) continue; // já salva
+    if (idExterno && (await db.mensagemWhatsapp.findFirst({ where: { organizacaoId, idExterno }, select: { id: true } }))) {
+      continue; // já salva
+    }
 
-    const telefone = jid.split("@")[0];
-    const { clienteId, contatoId } = await encontrarPorTelefone(organizacaoId, telefone);
+    let arquivo: string | null = null;
+    if (lida.base64) {
+      arquivo = await salvarArquivo(organizacaoId, Buffer.from(lida.base64, "base64"), lida.mimetype, lida.nomeArquivo).catch(
+        (e) => {
+          console.error("[webhook] não consegui gravar a mídia:", e);
+          return null;
+        },
+      );
+    }
+
     const quando = Number(m.messageTimestamp);
-
-    await db.mensagemWhatsapp.create({
-      data: {
-        organizacaoId,
-        telefone,
-        clienteId,
-        contatoId,
-        // fromMe = mensagem enviada pelo celular da empresa (fora do CRM)
-        direcao: m.key?.fromMe ? "SAIDA" : "ENTRADA",
-        conteudo,
-        status: m.key?.fromMe ? "enviada pelo celular" : (m.pushName ?? null),
-        idExterno,
-        criadoEm: quando ? new Date(quando * 1000) : undefined,
-      },
+    const doCelularDaEmpresa = Boolean(m.key?.fromMe);
+    const { nova } = await registrarMensagem({
+      organizacaoId,
+      telefone: jid.split("@")[0],
+      // fromMe = mensagem enviada pelo celular da empresa (fora do CRM)
+      direcao: doCelularDaEmpresa ? "SAIDA" : "ENTRADA",
+      tipo: lida.tipo,
+      conteudo: lida.conteudo,
+      arquivo,
+      mimetype: lida.mimetype ?? null,
+      nomeArquivo: lida.nomeArquivo ?? null,
+      status: doCelularDaEmpresa ? "enviada pelo celular" : null,
+      idExterno,
+      criadoEm: quando ? new Date(quando * 1000) : undefined,
+      nomePerfil: doCelularDaEmpresa ? null : (m.pushName ?? null),
+      doCliente: !doCelularDaEmpresa,
     });
-    salvas++;
+    if (nova) salvas++;
   }
 
   return Response.json({ ok: true, salvas });

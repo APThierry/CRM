@@ -41,6 +41,9 @@ model Organizacao {
   atividades    Atividade[]
   mensagens     MensagemWhatsapp[]
   whatsapp      ConfiguracaoWhatsapp?
+  conversas     Conversa[]
+  etiquetas     Etiqueta[]
+  respostas     RespostaRapida[]
 }
 
 enum Papel {
@@ -70,6 +73,8 @@ model Usuario {
   turmasComoInstrutor Turma[]
   sessoes             Sessao[]
   mensagens           MensagemWhatsapp[]
+  conversas           Conversa[]
+  respostas           RespostaRapida[]
 
   @@index([organizacaoId])
 }
@@ -125,6 +130,7 @@ model Cliente {
   participantes Participante[]
   atividades    Atividade[]
   mensagens     MensagemWhatsapp[]
+  conversas     Conversa[]
 
   @@index([organizacaoId])
   @@index([organizacaoId, nome])
@@ -147,6 +153,7 @@ model Contato {
   cliente     Cliente            @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   negocios    Negocio[]
   mensagens   MensagemWhatsapp[]
+  conversas   Conversa[]
 
   @@index([organizacaoId])
   @@index([clienteId])
@@ -367,24 +374,109 @@ enum DirecaoMensagem {
   SAIDA
 }
 
+// ---------------------------------------------------------------------------
+// Central de atendimento (Fase B)
+// ---------------------------------------------------------------------------
+
+enum StatusConversa {
+  ABERTA
+  FINALIZADA
+}
+
+enum TipoMensagem {
+  TEXTO
+  IMAGEM
+  AUDIO
+  VIDEO
+  DOCUMENTO
+  FIGURINHA
+  OUTRO
+}
+
+/// Uma conversa por número de WhatsApp. Junta todas as mensagens daquele número
+/// e guarda quem está atendendo, as etiquetas e quantas mensagens não foram lidas.
+model Conversa {
+  id            String           @id @default(cuid())
+  organizacaoId String
+  telefone      String // como o WhatsApp manda, ex.: 553199998888
+  chave         String // DDD + 8 últimos dígitos (não muda com o nono dígito)
+  nome          String? // nome do perfil no WhatsApp
+  clienteId     String?
+  contatoId     String?
+  atendenteId   String? // quem está atendendo; vazio = na fila
+  status        StatusConversa   @default(ABERTA)
+  naoLidas      Int              @default(0)
+  ultimaEm      DateTime         @default(now())
+  ultimaTexto   String?
+  ultimaDirecao DirecaoMensagem?
+  criadoEm      DateTime         @default(now())
+
+  organizacao Organizacao        @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  cliente     Cliente?           @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  contato     Contato?           @relation(fields: [contatoId], references: [id], onDelete: SetNull)
+  atendente   Usuario?           @relation(fields: [atendenteId], references: [id], onDelete: SetNull)
+  mensagens   MensagemWhatsapp[]
+  etiquetas   Etiqueta[]
+
+  @@unique([organizacaoId, chave])
+  @@index([organizacaoId, status, ultimaEm])
+  @@index([atendenteId])
+}
+
+/// Etiquetas para organizar conversas (ex.: "Orçamento", "Reciclagem", "Urgente").
+model Etiqueta {
+  id            String   @id @default(cuid())
+  organizacaoId String
+  nome          String
+  cor           String   @default("#64748b")
+  criadoEm      DateTime @default(now())
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  conversas   Conversa[]
+
+  @@unique([organizacaoId, nome])
+}
+
+/// Textos prontos. Digite "/" na conversa para escolher. Sem usuário = da equipe toda.
+model RespostaRapida {
+  id            String   @id @default(cuid())
+  organizacaoId String
+  usuarioId     String?
+  atalho        String // ex.: "preco" (usado como /preco)
+  texto         String
+  criadoEm      DateTime @default(now())
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  usuario     Usuario?    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([organizacaoId])
+}
+
 model MensagemWhatsapp {
   id            String          @id @default(cuid())
   organizacaoId String
+  conversaId    String
   clienteId     String?
   contatoId     String?
   telefone      String
   direcao       DirecaoMensagem
-  conteudo      String
+  tipo          TipoMensagem    @default(TEXTO)
+  conteudo      String // texto, legenda ou descrição ("🎤 Áudio")
+  arquivo       String? // caminho do arquivo de mídia, dentro de ARQUIVOS_DIR
+  mimetype      String?
+  nomeArquivo   String?
   status        String? // enviada, entregue, lida, erro
   idExterno     String? // id da mensagem no provedor
   usuarioId     String? // atendente que enviou pelo CRM
   criadoEm      DateTime        @default(now())
 
   organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  conversa    Conversa    @relation(fields: [conversaId], references: [id], onDelete: Cascade)
   cliente     Cliente?    @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   contato     Contato?    @relation(fields: [contatoId], references: [id], onDelete: SetNull)
   usuario     Usuario?    @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
 
   @@index([organizacaoId, telefone])
+  @@index([conversaId, criadoEm])
   @@index([clienteId])
 }

@@ -20,7 +20,7 @@ async function chamar<T>(metodo: "GET" | "POST" | "DELETE", caminho: string, cor
       headers: { apikey: CHAVE, "Content-Type": "application/json" },
       body: corpo ? JSON.stringify(corpo) : undefined,
       cache: "no-store",
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(60_000), // mídia pode demorar para subir
     });
   } catch {
     throw new ErroWhatsapp(`Não foi possível falar com a Evolution API em ${URL_API}. Ela está ligada?`);
@@ -41,7 +41,8 @@ function configuracaoWebhook() {
     url: process.env.WHATSAPP_WEBHOOK_URL ?? "http://localhost:3000/api/whatsapp/webhook",
     headers: { "x-crm-segredo": process.env.WHATSAPP_WEBHOOK_SEGREDO ?? "" },
     byEvents: false,
-    base64: false,
+    // Fotos, áudios, vídeos e documentos chegam junto com a mensagem.
+    base64: true,
     events: ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],
   };
 }
@@ -103,5 +104,32 @@ export async function desconectar() {
 /** Envia uma mensagem de texto. `numero` só com dígitos e DDI, ex.: 5531988887777. */
 export async function enviarTexto(numero: string, texto: string) {
   const r = await chamar<{ key?: { id?: string } }>("POST", `/message/sendText/${INSTANCIA}`, { number: numero, text: texto });
+  return { idExterno: r.key?.id ?? null };
+}
+
+export type TipoMidia = "image" | "video" | "document";
+
+/** Envia foto, vídeo ou documento. `base64` sem o prefixo "data:". */
+export async function enviarMidia(
+  numero: string,
+  midia: { tipo: TipoMidia; base64: string; mimetype: string; nomeArquivo?: string; legenda?: string },
+) {
+  const r = await chamar<{ key?: { id?: string } }>("POST", `/message/sendMedia/${INSTANCIA}`, {
+    number: numero,
+    mediatype: midia.tipo,
+    mimetype: midia.mimetype,
+    media: midia.base64,
+    fileName: midia.nomeArquivo,
+    caption: midia.legenda || undefined,
+  });
+  return { idExterno: r.key?.id ?? null };
+}
+
+/** Envia áudio como mensagem de voz (aparece como se tivesse sido gravado na hora). */
+export async function enviarAudio(numero: string, base64: string) {
+  const r = await chamar<{ key?: { id?: string } }>("POST", `/message/sendWhatsAppAudio/${INSTANCIA}`, {
+    number: numero,
+    audio: base64,
+  });
   return { idExterno: r.key?.id ?? null };
 }

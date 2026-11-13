@@ -5,16 +5,17 @@ import { db } from "@/lib/db";
 import { normalizarWhatsapp } from "@/lib/formatar";
 import { getUsuarioAtual } from "@/lib/auth";
 import { getOrganizacaoAtual } from "@/lib/org";
+import { buscarConversa } from "@/lib/atendimento";
+import { enviarNaConversa } from "@/lib/whatsapp/enviar";
 import {
   desconectar,
-  enviarTexto,
   ErroWhatsapp,
   estadoConexao,
   garantirInstancia,
   gerarQrCode,
   INSTANCIA,
 } from "@/lib/whatsapp/evolution";
-import { encontrarPorTelefone } from "@/lib/whatsapp/mensagens";
+import { obterConversa } from "@/lib/whatsapp/mensagens";
 
 /** Grava qual instância pertence à organização (usado pelo webhook). */
 async function registrarConfiguracao(organizacaoId: string, ativo: boolean) {
@@ -73,29 +74,21 @@ export async function enviarParaCliente(
   });
   if (!cliente) return { erro: "Cliente não encontrado." };
 
-  const texto = String(formData.get("texto") ?? "").trim();
-  if (!texto) return { erro: "Escreva a mensagem." };
-
   // Número escolhido no formulário, ou o WhatsApp do cliente, ou o do contato principal.
   const escolhido = String(formData.get("numero") ?? "");
   const numero = normalizarWhatsapp(escolhido || cliente.whatsapp || cliente.contatos.find((c) => c.whatsapp)?.whatsapp);
   if (!numero) return { erro: "Este cliente não tem número de WhatsApp cadastrado." };
 
-  try {
-    // Assinatura: o cliente vê "*Ana:*" (negrito no WhatsApp) antes do texto.
-    const assinado = eu.assinaturaWhatsapp ? `*${eu.nome.split(" ")[0]}:*
-${texto}` : texto;
-    const { idExterno } = await enviarTexto(numero, assinado);
-    const { contatoId } = await encontrarPorTelefone(org.id, numero);
-    // A Evolution API também avisa o webhook sobre esta mensagem. Se o webhook
-    // chegou primeiro, só atualizamos o registro em vez de duplicar.
-    const jaSalva = idExterno ? await db.mensagemWhatsapp.findFirst({ where: { organizacaoId: org.id, idExterno } }) : null;
-    const dados = { clienteId, contatoId, telefone: numero, direcao: "SAIDA" as const, conteudo: texto, status: "enviada", idExterno, usuarioId: eu.id };
-    if (jaSalva) await db.mensagemWhatsapp.update({ where: { id: jaSalva.id }, data: dados });
-    else await db.mensagemWhatsapp.create({ data: { ...dados, organizacaoId: org.id } });
-    refresh();
-    return { ok: true };
-  } catch (e) {
-    return { erro: e instanceof ErroWhatsapp ? e.message : "Não foi possível enviar." };
+  // A mensagem entra na conversa daquele número, a mesma da Central de atendimento.
+  const conversa = await obterConversa(org.id, numero);
+  if (!(await buscarConversa(eu, conversa.id))) return { erro: "A conversa com este número está com outro atendente." };
+  if (!conversa.clienteId) {
+    await db.$transaction([
+      db.conversa.update({ where: { id: conversa.id }, data: { clienteId } }),
+      db.mensagemWhatsapp.updateMany({ where: { conversaId: conversa.id }, data: { clienteId } }),
+    ]);
   }
+  const resultado = await enviarNaConversa(eu, conversa, { texto: String(formData.get("texto") ?? "") });
+  if (resultado.ok) refresh();
+  return resultado;
 }
