@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { normalizarWhatsapp } from "@/lib/formatar";
 import { getUsuarioAtual } from "@/lib/auth";
 import { getOrganizacaoAtual } from "@/lib/org";
+import { dadosCliente, dispararComDados } from "@/lib/webhooks/disparar";
 import type { TipoAtividade } from "@/generated/prisma/client";
 
 const texto = (f: FormData, campo: string) => {
@@ -54,6 +55,7 @@ export async function criarCliente(formData: FormData) {
     },
   });
 
+  await dispararComDados(org.id, "cliente.criado", () => dadosCliente(cliente.id));
   redirect(`/clientes/${cliente.id}`);
 }
 

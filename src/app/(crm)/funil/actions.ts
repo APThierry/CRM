@@ -3,12 +3,13 @@ import { refresh } from "next/cache";
 import { db } from "@/lib/db";
 import { getUsuarioAtual } from "@/lib/auth";
 import { getOrganizacaoAtual } from "@/lib/org";
+import { dadosNegocio, dispararComDados } from "@/lib/webhooks/disparar";
 
 /** Move um negócio para outra etapa (chamado ao arrastar o cartão no Kanban). */
 export async function moverNegocio(negocioId: string, etapaId: string) {
   const org = await getOrganizacaoAtual();
   const [negocio, etapa] = await Promise.all([
-    db.negocio.findFirst({ where: { id: negocioId, organizacaoId: org.id } }),
+    db.negocio.findFirst({ where: { id: negocioId, organizacaoId: org.id }, include: { etapa: { select: { tipo: true } } } }),
     db.etapaFunil.findFirst({ where: { id: etapaId, organizacaoId: org.id } }),
   ]);
   if (!negocio || !etapa) throw new Error("Negócio ou etapa não encontrados.");
@@ -21,6 +22,12 @@ export async function moverNegocio(negocioId: string, etapaId: string) {
       fechadoEm: etapa.tipo === "ABERTA" ? null : negocio.fechadoEm ?? new Date(),
     },
   });
+  // Webhooks: avisa a mudança de etapa e, se for o caso, a venda ganha ou perdida.
+  if (negocio.etapaId !== etapaId) {
+    await dispararComDados(org.id, "negocio.etapa", () => dadosNegocio(negocioId));
+    if (etapa.tipo === "GANHO" && negocio.etapa.tipo !== "GANHO") await dispararComDados(org.id, "negocio.ganho", () => dadosNegocio(negocioId));
+    if (etapa.tipo === "PERDIDO" && negocio.etapa.tipo !== "PERDIDO") await dispararComDados(org.id, "negocio.perdido", () => dadosNegocio(negocioId));
+  }
   refresh();
 }
 
@@ -46,7 +53,7 @@ export async function criarNegocio(formData: FormData) {
   const valor = Number(String(formData.get("valor") ?? "0").replace(/\./g, "").replace(",", ".")) || 0;
   const titulo = String(formData.get("titulo") ?? "").trim() || `${servico?.nome ?? "Treinamento"} - ${cliente.nome}`;
 
-  await db.negocio.create({
+  const negocio = await db.negocio.create({
     data: {
       organizacaoId: org.id,
       titulo,
@@ -58,5 +65,6 @@ export async function criarNegocio(formData: FormData) {
       quantidadeAlunos: alunos,
     },
   });
+  await dispararComDados(org.id, "negocio.criado", () => dadosNegocio(negocio.id));
   refresh();
 }

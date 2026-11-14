@@ -50,7 +50,7 @@
 ## Fase 4: Reciclagem e painel
 - [x] Lista de certificados vencendo
 - [x] Lembrete de reciclagem por WhatsApp (Fase D, com aprovação do gestor)
-- [ ] Painel: vendas do mês, valor no funil, conversão, turmas da semana
+- [x] Painel: vendas do mês, valor no funil, conversão, turmas da semana (conversão e cortes na tela Relatórios)
 
 ## Fase 5: Produção
 - [ ] Dockerfile e docker-compose
@@ -96,4 +96,14 @@
   - [ ] Campanhas com foto ou PDF
   - [ ] Tela para mudar o ritmo (hoje fixo em ritmo.ts)
   - [ ] Esconder o item Campanhas do menu para quem não é gestor
-- [ ] Fase E: Relatórios e integrações (por atendente, exportação, Google Agenda, webhooks)
+- [x] Fase E: Relatórios e integrações (detalhes em docs/INTEGRACOES.md)
+  - [x] Relatórios por atendente: mensagens, conversas, tempo de resposta (mediana), aguardando agora, negócios e valor ganho
+  - [x] Vendas e funil: valor ganho, ticket médio, conversão, funil atual, por mês, curso, origem e segmento, motivos de perda
+  - [x] Turmas e certificados: alunos treinados, aprovação, certificados emitidos, por curso e cliente, vencimentos por mês
+  - [x] Exportação CSV para Excel (clientes, negócios, certificados, atendentes), protegida contra fórmulas
+  - [x] Google Agenda por link de assinatura (.ics) pessoal: turmas, tarefas e WhatsApp agendado
+  - [x] Webhooks de saída assinados (HMAC-SHA256), com fila, 6 tentativas, teste e reenvio
+  - [x] Teste automático (scripts/testar-integracoes.mts)
+  - [ ] Gráficos nos relatórios
+  - [ ] Webhook para os negócios criados em lote pela reciclagem
+  - [ ] Google Agenda com escrita (OAuth), se o link de assinatura não bastar

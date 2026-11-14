@@ -50,6 +50,7 @@ model Organizacao {
   agendadas     MensagemAgendada[]
   campanhas     Campanha[]
   descadastros  Descadastro[]
+  webhooks      Webhook[]
 }
 
 enum Papel {
@@ -69,6 +70,8 @@ model Usuario {
   ativo              Boolean   @default(true)
   // Assinar as mensagens de WhatsApp com o nome (ex.: "*Ana:* Bom dia!")
   assinaturaWhatsapp Boolean   @default(true)
+  // Link da agenda (.ics) para assinar no Google Agenda. Guardamos só o hash do código.
+  agendaTokenHash    String?   @unique
   ultimoAcesso       DateTime?
   criadoEm           DateTime  @default(now())
 
@@ -699,4 +702,54 @@ model Descadastro {
   organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
 
   @@unique([organizacaoId, chave])
+}
+
+// ---------------------------------------------------------------------------
+// Integrações (Fase E): webhooks de saída
+// ---------------------------------------------------------------------------
+
+/// Endereço de outro sistema (n8n, Zapier, Make...) que recebe um aviso quando
+/// algo acontece no CRM. Cada aviso é assinado com o segredo (HMAC-SHA256).
+model Webhook {
+  id            String   @id @default(cuid())
+  organizacaoId String
+  nome          String
+  url           String
+  segredo       String // usado para assinar (o outro sistema confere a assinatura)
+  // Eventos que este endereço recebe (ex.: "negocio.ganho"). Lista em src/lib/webhooks/eventos.ts.
+  eventos       String[]
+  ativo         Boolean  @default(true)
+  criadoEm      DateTime @default(now())
+
+  organizacao Organizacao      @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  entregas    EntregaWebhook[]
+
+  @@index([organizacaoId, ativo])
+}
+
+enum StatusEntrega {
+  PENDENTE // esperando a (próxima) tentativa
+  ENVIANDO
+  ENTREGUE
+  FALHOU // esgotou as tentativas
+}
+
+/// Um aviso para um webhook. O relógio entrega e tenta de novo se der erro.
+model EntregaWebhook {
+  id             String        @id @default(cuid())
+  webhookId      String
+  evento         String
+  payload        Json
+  status         StatusEntrega @default(PENDENTE)
+  tentativas     Int           @default(0)
+  proximaEm      DateTime      @default(now())
+  respostaCodigo Int? // código HTTP da última tentativa
+  erro           String? // o que deu errado na última tentativa
+  entregueEm     DateTime?
+  criadoEm       DateTime      @default(now())
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([status, proximaEm])
+  @@index([webhookId, criadoEm])
 }

@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { chaveTelefone } from "@/lib/formatar";
 import { enviarAutomatico } from "@/lib/whatsapp/enviar";
+import { dispararEvento } from "@/lib/webhooks/disparar";
 import { CONFIRMACAO_SAIR, querSair } from "./ritmo";
 
 /** Como a Evolution API 2.3 manda o evento messages.update. */
@@ -65,7 +66,8 @@ export async function aoResponderCampanha(m: { organizacaoId: string; telefone: 
 
   const ja = await db.descadastro.findUnique({ where: { organizacaoId_chave: { organizacaoId: m.organizacaoId, chave } } });
   if (!ja) {
-    await db.descadastro.create({ data: { organizacaoId: m.organizacaoId, chave, telefone: m.telefone, origem: "respondeu SAIR" } });
+    const d = await db.descadastro.create({ data: { organizacaoId: m.organizacaoId, chave, telefone: m.telefone, origem: "respondeu SAIR" } });
+    await dispararEvento(m.organizacaoId, "contato.descadastrou", { telefone: d.telefone, origem: d.origem, criadoEm: d.criadoEm.toISOString() });
   }
   // Tira o número das campanhas que ainda não chegaram nele.
   await db.destinatarioCampanha.updateMany({

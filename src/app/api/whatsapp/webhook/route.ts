@@ -14,6 +14,7 @@ import { registrarStatus } from "@/lib/campanhas/status";
 import { salvarArquivo } from "@/lib/arquivos";
 import { db } from "@/lib/db";
 import { getOrganizacaoPadrao } from "@/lib/org";
+import { dispararEvento } from "@/lib/webhooks/disparar";
 import { interpretarMensagem, registrarMensagem, type ConteudoWhatsapp } from "@/lib/whatsapp/mensagens";
 
 type MensagemRecebida = {
@@ -98,6 +99,19 @@ export async function POST(request: Request) {
     if (nova && conversa && !doCelularDaEmpresa) {
       const recebida = { conversa, tipo: lida.tipo, conteudo: lida.conteudo, criadoEm: quando ? new Date(quando * 1000) : new Date() };
       after(() => aoReceberDoCliente(recebida).catch((e) => console.error("[automação] falhou:", e)));
+      // Webhooks de saída (Fase E): avisa outro sistema. Mídia vai só como descrição, sem o arquivo.
+      after(() =>
+        dispararEvento(organizacaoId, "mensagem.recebida", {
+          conversaId: conversa.id,
+          telefone: conversa.telefone,
+          nomePerfil: conversa.nome,
+          clienteId: conversa.clienteId,
+          contatoId: conversa.contatoId,
+          tipo: lida.tipo,
+          conteudo: lida.conteudo,
+          recebidaEm: recebida.criadoEm.toISOString(),
+        }),
+      );
     }
   }
 

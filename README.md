@@ -30,9 +30,10 @@ Ele foi pensado desde o início para atender **várias empresas (multiempresa)**
 1. [Instalação local (no seu PC)](docs/INSTALACAO-LOCAL.md)
 2. [Arquitetura e modelo de dados](docs/ARQUITETURA.md)
 3. [Integração com WhatsApp](docs/WHATSAPP.md)
-4. [Instalação na VPS](docs/DEPLOY-VPS.md)
-5. [Roteiro (o que já foi feito e o que falta)](docs/ROADMAP.md)
-6. [Guia de Git (controle de versões)](docs/GIT.md)
+4. [Relatórios, exportação, Google Agenda e webhooks](docs/INTEGRACOES.md)
+5. [Instalação na VPS](docs/DEPLOY-VPS.md)
+6. [Roteiro (o que já foi feito e o que falta)](docs/ROADMAP.md)
+7. [Guia de Git (controle de versões)](docs/GIT.md)
 
 ## Começo rápido
 

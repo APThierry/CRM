@@ -2,6 +2,7 @@
 // Ações da Central de atendimento. Todas conferem o login e se a pessoa pode
 // ver a conversa (src/lib/atendimento.ts) — podem ser chamadas direto por POST.
 import { refresh } from "next/cache";
+import { dadosCliente, dadosNegocio, dispararComDados } from "@/lib/webhooks/disparar";
 import { redirect } from "next/navigation";
 import { getUsuarioAtual } from "@/lib/auth";
 import { agendarMensagem as agendar, iniciarSequencia as iniciar } from "@/lib/automacao/agendar";
@@ -141,6 +142,7 @@ export async function cadastrarClienteDaConversa(conversaId: string, formData: F
     include: { contatos: true },
   });
   await ligarAoCliente(conversa.id, cliente.id, cliente.contatos[0]?.id ?? null);
+  await dispararComDados(eu.organizacao.id, "cliente.criado", () => dadosCliente(cliente.id));
   refresh();
 }
 
@@ -187,7 +189,7 @@ export async function criarNegocioDaConversa(conversaId: string, formData: FormD
   if (!cliente || !primeiraEtapa) throw new Error("Cliente ou funil não encontrados.");
   const valor = Number(campo(formData, "valor").replace(/\./g, "").replace(",", ".")) || 0;
 
-  await db.negocio.create({
+  const negocio = await db.negocio.create({
     data: {
       organizacaoId: org,
       titulo: `${servico?.nome ?? "Treinamento"} - ${cliente.nome}`,
@@ -200,6 +202,7 @@ export async function criarNegocioDaConversa(conversaId: string, formData: FormD
       quantidadeAlunos: Number(campo(formData, "quantidadeAlunos")) || null,
     },
   });
+  await dispararComDados(org, "negocio.criado", () => dadosNegocio(negocio.id));
   refresh();
 }
 

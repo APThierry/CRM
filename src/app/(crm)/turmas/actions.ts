@@ -7,6 +7,7 @@ import { calcularValidade, proximoNumeroCertificado } from "@/lib/certificados";
 import { db } from "@/lib/db";
 import { deInputData } from "@/lib/formatar";
 import { getOrganizacaoAtual } from "@/lib/org";
+import { dadosCertificado, dispararComDados } from "@/lib/webhooks/disparar";
 import type { Modalidade, StatusTurma } from "@/generated/prisma/client";
 
 const texto = (f: FormData, campo: string) => {
@@ -157,6 +158,7 @@ export async function definirResultado(matriculaId: string, aprovado: boolean | 
         emitidoEm: matricula.emitidoEm ?? new Date(),
       },
     });
+    if (!matricula.certificadoNumero) await dispararComDados(org.id, "certificado.emitido", () => dadosCertificado(matriculaId));
   } else {
     await db.matricula.update({ where: { id: matriculaId }, data: { aprovado, validadeAte: null } });
   }
@@ -181,6 +183,7 @@ export async function concluirTurma(turmaId: string) {
         emitidoEm: m.emitidoEm ?? new Date(),
       },
     });
+    if (!m.certificadoNumero) await dispararComDados(org.id, "certificado.emitido", () => dadosCertificado(m.id));
   }
   await db.turma.update({ where: { id: turmaId }, data: { status: "REALIZADA" } });
   refresh();

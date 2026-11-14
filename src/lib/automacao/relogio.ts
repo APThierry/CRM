@@ -1,6 +1,6 @@
 import "server-only";
 // O "relógio" da automação: a cada 30 segundos envia as mensagens agendadas
-// que já passaram da hora e a próxima mensagem das campanhas (src/lib/campanhas/motor.ts). Começa junto com o servidor (src/instrumentation.ts).
+// que já passaram da hora a próxima mensagem das campanhas (src/lib/campanhas/motor.ts) e os avisos de webhook (src/lib/webhooks/disparar.ts). Começa junto com o servidor (src/instrumentation.ts).
 //
 // Na VPS rodamos UM processo do CRM, então não há dois relógios disputando.
 // Mesmo assim cada mensagem é "reservada" (PENDENTE -> ENVIANDO) antes de sair,
@@ -10,6 +10,7 @@ import { processarCampanhas } from "@/lib/campanhas/motor";
 import { db } from "@/lib/db";
 import { enviarAutomatico } from "@/lib/whatsapp/enviar";
 import { ErroWhatsapp, garantirWebhook } from "@/lib/whatsapp/evolution";
+import { processarWebhooks } from "@/lib/webhooks/disparar";
 
 const INTERVALO = 30_000;
 const POR_RODADA = 20;
@@ -78,6 +79,13 @@ export function iniciarRelogio() {
       if (c.enviadas) console.log(`[relógio] ${c.enviadas} mensagem(ns) de campanha enviada(s)`);
     } catch (e) {
       console.error("[relógio] campanhas falharam:", e);
+    }
+    // Webhooks de saída (Fase E): entrega os avisos para outros sistemas.
+    try {
+      const w = await processarWebhooks();
+      if (w.vistas) console.log(`[relógio] ${w.entregues} de ${w.vistas} aviso(s) de webhook entregue(s)`);
+    } catch (e) {
+      console.error("[relógio] webhooks falharam:", e);
     } finally {
       rodando = false;
     }

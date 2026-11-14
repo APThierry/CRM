@@ -21,8 +21,10 @@ const itens = [
   { href: "/certificados", rotulo: "Certificados", icone: "✎" },
   { href: "/cursos", rotulo: "Cursos", icone: "✚" },
   { href: "/campanhas", rotulo: "Campanhas", icone: "📣" },
+  { href: "/relatorios", rotulo: "Relatórios", icone: "▥" },
   { href: "/automacao", rotulo: "Automação", icone: "⚙" },
   { href: "/whatsapp", rotulo: "WhatsApp", icone: "✆" },
+  { href: "/integracoes", rotulo: "Integrações", icone: "⇄" },
 ] as const;
 
 // `usuario` e `contador` chegam prontos do servidor (Server Components dentro de Suspense).
