@@ -14,7 +14,9 @@ import { obterAutomacao } from "@/lib/automacao/config";
 import { estaAberto } from "@/lib/automacao/horario";
 import { db } from "@/lib/db";
 import { enviarAutomatico } from "@/lib/whatsapp/enviar";
-import { ErroWhatsapp, estadoConexao, simulandoEnvio } from "@/lib/whatsapp/evolution";
+import { ErroWhatsapp, simulandoEnvio } from "@/lib/whatsapp/evolution";
+import { estadoDaEmpresa } from "@/lib/whatsapp/instancia";
+import { ondeLiberada } from "@/lib/empresas/situacao";
 import { chavesDescadastradas } from "./publico";
 import { esperaDepoisDe, inicioDoDia, RITMO, RODAPE_SAIR, variar } from "./ritmo";
 
@@ -52,7 +54,7 @@ export async function processarCampanhas(agora = new Date()) {
 
   // Agendadas que chegaram na hora viram "enviando" (se não houver outra enviando na organização).
   const agendadas = await db.campanha.findMany({
-    where: { status: "AGENDADA", OR: [{ iniciarEm: null }, { iniciarEm: { lte: agora } }] },
+    where: { status: "AGENDADA", OR: [{ iniciarEm: null }, { iniciarEm: { lte: agora } }], organizacao: ondeLiberada(agora) },
     orderBy: [{ iniciarEm: "asc" }, { criadoEm: "asc" }],
   });
   for (const c of agendadas) {
@@ -65,7 +67,8 @@ export async function processarCampanhas(agora = new Date()) {
   }
 
   const ativas = await db.campanha.findMany({
-    where: { status: "ENVIANDO" },
+    // Empresa suspensa ou com o teste vencido: a campanha fica parada onde está.
+    where: { status: "ENVIANDO", organizacao: ondeLiberada(agora) },
     include: { organizacao: { select: { nome: true } } },
   });
   let enviadas = 0;
@@ -103,7 +106,7 @@ async function enviarUma(campanha: CampanhaAtiva, agora: Date) {
   }
 
   if (!simulandoEnvio()) {
-    const { estado } = await estadoConexao();
+    const { estado } = await estadoDaEmpresa(org);
     if (estado !== "open") {
       await pausar(campanha.id, "o WhatsApp está desconectado. Conecte e clique em Retomar.");
       return false;

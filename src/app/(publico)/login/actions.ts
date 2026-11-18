@@ -2,7 +2,7 @@
 // Entrar, sair e primeiro acesso.
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { getOrganizacaoPadrao } from "@/lib/org";
+import { motivoBloqueio } from "@/lib/empresas/situacao";
 import { conferirSenha, gerarHashSenha, temSenha, validarSenhaNova } from "@/lib/senha";
 import { criarSessao, encerrarSessao } from "@/lib/sessao";
 
@@ -31,7 +31,7 @@ export async function entrar(_estado: EstadoFormulario, formData: FormData): Pro
     return { erro: `Muitas tentativas. Tente de novo em ${minutos} min.`, valores };
   }
 
-  const usuario = await db.usuario.findUnique({ where: { email } });
+  const usuario = await db.usuario.findUnique({ where: { email }, include: { organizacao: { select: { situacao: true, testeAte: true } } } });
   const ok = usuario?.ativo && (await conferirSenha(senha, usuario.senhaHash));
   if (!usuario || !ok) {
     const erros = (registro && registro.ate > Date.now() ? registro.erros : 0) + 1;
@@ -41,6 +41,9 @@ export async function entrar(_estado: EstadoFormulario, formData: FormData): Pro
   }
 
   tentativas.delete(email);
+  // Empresa suspensa ou com o teste vencido (Fase F): a senha está certa, mas não entra.
+  const bloqueio = motivoBloqueio(usuario.organizacao);
+  if (bloqueio) return { erro: bloqueio, valores };
   await criarSessao(usuario.id);
   redirect("/");
 }
@@ -50,15 +53,26 @@ export async function sair() {
   redirect("/login");
 }
 
-/** O primeiro acesso só fica liberado enquanto ninguém da organização tem senha. */
+/**
+ * Instalação nova: existe UMA empresa só (a do seed) e ninguém no sistema tem
+ * senha ainda. É o único caso em que o "primeiro acesso" cria um administrador
+ * sem login. Empresas novas entram pelo cadastro (Fase F2) ou pelo script
+ * scripts/criar-empresa.mts. Devolve a empresa, ou null se não estiver liberado.
+ */
+async function empresaDaInstalacaoNova() {
+  const empresas = await db.organizacao.findMany({ take: 2 });
+  if (empresas.length !== 1) return null;
+  const usuarios = await db.usuario.findMany({ select: { senhaHash: true } });
+  return usuarios.some((u) => temSenha(u.senhaHash)) ? null : empresas[0];
+}
+
 export async function primeiroAcessoLiberado() {
-  const org = await getOrganizacaoPadrao();
-  const usuarios = await db.usuario.findMany({ where: { organizacaoId: org.id }, select: { senhaHash: true } });
-  return !usuarios.some((u) => temSenha(u.senhaHash));
+  return (await empresaDaInstalacaoNova()) !== null;
 }
 
 export async function configurarPrimeiroAcesso(_estado: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
-  if (!(await primeiroAcessoLiberado())) return { erro: "O primeiro acesso já foi feito. Entre com seu e-mail e senha." };
+  const org = await empresaDaInstalacaoNova();
+  if (!org) return { erro: "O primeiro acesso já foi feito. Entre com seu e-mail e senha." };
 
   const nome = String(formData.get("nome") ?? "").trim();
   const email = normalizarEmail(formData.get("email"));
@@ -69,7 +83,6 @@ export async function configurarPrimeiroAcesso(_estado: EstadoFormulario, formDa
   const problema = validarSenhaNova(senha);
   if (problema) return { erro: problema, valores };
 
-  const org = await getOrganizacaoPadrao();
   const existente = await db.usuario.findUnique({ where: { email } });
   if (existente && existente.organizacaoId !== org.id) return { erro: "Este e-mail já é usado em outra organização.", valores };
 

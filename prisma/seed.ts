@@ -5,7 +5,7 @@
 // valores de referência e precisam ser conferidos com a Brigada.
 // Os clientes, contatos e negócios são FICTÍCIOS.
 import "dotenv/config";
-import { ETIQUETAS_PADRAO, RESPOSTAS_PADRAO } from "../src/lib/padroes-atendimento";
+import { prepararEmpresa } from "../src/lib/empresas/preparar";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, type Cliente, type Contato, type EtapaFunil, type Servico } from "../src/generated/prisma/client";
 
@@ -59,10 +59,12 @@ async function main() {
     { nome: "Fechado", cor: "#16a34a", tipo: "GANHO" as const },
     { nome: "Perdido", cor: "#dc2626", tipo: "PERDIDO" as const },
   ];
-  const etapas: EtapaFunil[] = [];
-  for (const [ordem, e] of etapasDados.entries()) {
-    etapas.push(await db.etapaFunil.create({ data: { ...e, ordem, organizacaoId } }));
-  }
+  // Funil, etiquetas, respostas rápidas, automação e instância do WhatsApp:
+  // o mesmo que toda empresa nova recebe (src/lib/empresas/preparar.ts).
+  // A Brigada usa a instância "crm" (a que já estava conectada antes da Fase F).
+  await prepararEmpresa(db, org, etapasDados);
+  await db.configuracaoWhatsapp.update({ where: { organizacaoId }, data: { instancia: process.env.EVOLUTION_INSTANCIA ?? "crm" } });
+  const etapas: EtapaFunil[] = await db.etapaFunil.findMany({ where: { organizacaoId }, orderBy: { ordem: "asc" } });
   const etapa = (nome: string) => etapas.find((e) => e.nome === nome)!;
 
   // Cursos do site da Brigada MG.
@@ -254,8 +256,6 @@ async function main() {
   });
 
   // Central de atendimento: etiquetas e respostas rápidas para começar.
-  await db.etiqueta.createMany({ data: ETIQUETAS_PADRAO.map((e) => ({ ...e, organizacaoId })) });
-  await db.respostaRapida.createMany({ data: RESPOSTAS_PADRAO.map((r) => ({ ...r, organizacaoId })) });
 
   console.log(`Seed concluído: ${clientes.length} clientes, ${cursos.length} cursos, ${negociosDados.length} negócios.`);
 }

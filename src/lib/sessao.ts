@@ -7,6 +7,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { cache } from "react";
 import { db } from "@/lib/db";
+import { empresaLiberada } from "@/lib/empresas/situacao";
 
 export const COOKIE_SESSAO = "crm_sessao";
 const DURACAO_DIAS = 30;
@@ -58,5 +59,7 @@ export const lerSessao = cache(async () => {
     include: { usuario: { include: { organizacao: true } } },
   });
   if (!sessao || sessao.expiraEm < new Date() || !sessao.usuario.ativo) return null;
+  // Empresa suspensa ou com o teste vencido: a sessão deixa de valer na hora.
+  if (!empresaLiberada(sessao.usuario.organizacao)) return null;
   return sessao;
 });

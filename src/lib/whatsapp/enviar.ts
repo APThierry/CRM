@@ -6,6 +6,7 @@ import type { UsuarioAtual } from "@/lib/auth";
 import { salvarArquivo, TAMANHO_MAXIMO } from "@/lib/arquivos";
 import { db } from "@/lib/db";
 import { enviarAudio, enviarMidia, enviarTexto, ErroWhatsapp } from "@/lib/whatsapp/evolution";
+import { instanciaDaEmpresa } from "@/lib/whatsapp/instancia";
 import { registrarMensagem } from "@/lib/whatsapp/mensagens";
 
 /** "*Ana:*\nBom dia!" quando a pessoa usa assinatura (negrito no WhatsApp). */
@@ -39,6 +40,7 @@ export async function enviarNaConversa(
 
   const numero = conversa.telefone;
   try {
+    const instancia = await instanciaDaEmpresa(conversa.organizacaoId);
     if (temArquivo) {
       const mimetype = arquivo.type || "application/octet-stream";
       const { evolution, tipo } = tipoDoArquivo(mimetype);
@@ -49,8 +51,8 @@ export async function enviarNaConversa(
       const legenda = evolution === "audio" ? "" : assinar(eu, limpo);
       const { idExterno } =
         evolution === "audio"
-          ? await enviarAudio(numero, base64)
-          : await enviarMidia(numero, { tipo: evolution, base64, mimetype, nomeArquivo: arquivo.name, legenda });
+          ? await enviarAudio(instancia, numero, base64)
+          : await enviarMidia(instancia, numero, { tipo: evolution, base64, mimetype, nomeArquivo: arquivo.name, legenda });
 
       const caminho = await salvarArquivo(conversa.organizacaoId, conteudoArquivo, mimetype, arquivo.name);
       const padrao = { IMAGEM: "📷 Imagem", VIDEO: "🎥 Vídeo", AUDIO: "🎤 Áudio", DOCUMENTO: `📎 ${arquivo.name}` }[tipo];
@@ -97,7 +99,8 @@ export async function enviarAutomatico(
   /** Como aparece na conversa (padrão: "agendada" ou "automática"). Campanhas usam "campanha". */
   rotulo?: string,
 ) {
-  const { idExterno } = await enviarTexto(conversa.telefone, autor ? assinar(autor, texto) : texto);
+  const instancia = await instanciaDaEmpresa(conversa.organizacaoId);
+  const { idExterno } = await enviarTexto(instancia, conversa.telefone, autor ? assinar(autor, texto) : texto);
   await registrarMensagem({
     organizacaoId: conversa.organizacaoId,
     telefone: conversa.telefone,
@@ -111,7 +114,7 @@ export async function enviarAutomatico(
 }
 
 async function enviarSoTexto(eu: UsuarioAtual, conversa: Pick<Conversa, "organizacaoId" | "telefone">, texto: string) {
-  const { idExterno } = await enviarTexto(conversa.telefone, assinar(eu, texto));
+  const { idExterno } = await enviarTexto(await instanciaDaEmpresa(conversa.organizacaoId), conversa.telefone, assinar(eu, texto));
   await registrarMensagem({
     organizacaoId: conversa.organizacaoId,
     telefone: conversa.telefone,

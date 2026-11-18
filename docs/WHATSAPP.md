@@ -202,7 +202,7 @@ Roda 25 verificações no banco local **em modo simulação** (ritmo, horário, 
 |---|---|
 | `EVOLUTION_API_URL` | Endereço da Evolution API |
 | `EVOLUTION_API_KEY` | Chave de acesso (igual à `AUTHENTICATION_API_KEY` da Evolution) |
-| `EVOLUTION_INSTANCIA` | Nome da conexão (uma por organização) |
+| `EVOLUTION_INSTANCIA` | Só para o seed: nome da conexão da Brigada MG. Cada empresa tem a própria conexão, guardada no banco (`ConfiguracaoWhatsapp.instancia`, padrão `crm-<slug>`), e criada na tela WhatsApp |
 | `WHATSAPP_WEBHOOK_URL` | Endereço que a Evolution chama para entregar mensagens |
 | `WHATSAPP_WEBHOOK_SEGREDO` | Segredo enviado no cabeçalho `x-crm-segredo`; o CRM recusa chamadas sem ele |
 | `ARQUIVOS_DIR` | Pasta das mídias (padrão: `../crm-arquivos`, fora do projeto). Faça backup dela junto com o banco |

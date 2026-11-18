@@ -13,7 +13,7 @@ type AvisoStatus = { keyId?: string; fromMe?: boolean; status?: string };
  * "DELIVERY_ACK" = entregue no celular; "READ"/"PLAYED" = lida (ou áudio ouvido).
  * Só mensagens nossas (fromMe) que saíram por uma campanha.
  */
-export async function registrarStatus(dados: unknown) {
+export async function registrarStatus(organizacaoId: string, dados: unknown) {
   const avisos = (Array.isArray(dados) ? dados : [dados]) as AvisoStatus[];
   let atualizadas = 0;
   for (const a of avisos) {
@@ -24,11 +24,11 @@ export async function registrarStatus(dados: unknown) {
     if (!entregue) continue;
     // Quem leu também recebeu: preenche os dois (sem apagar uma data que já existe).
     const r1 = await db.destinatarioCampanha.updateMany({
-      where: { idExterno: a.keyId, entregueEm: null },
+      where: { idExterno: a.keyId, entregueEm: null, campanha: { organizacaoId } },
       data: { entregueEm: agora },
     });
     const r2 = lida
-      ? await db.destinatarioCampanha.updateMany({ where: { idExterno: a.keyId, lidaEm: null }, data: { lidaEm: agora } })
+      ? await db.destinatarioCampanha.updateMany({ where: { idExterno: a.keyId, lidaEm: null, campanha: { organizacaoId } }, data: { lidaEm: agora } })
       : { count: 0 };
     atualizadas += r1.count + r2.count;
   }

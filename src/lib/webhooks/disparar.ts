@@ -15,6 +15,7 @@ import "server-only";
 import { createHmac, randomBytes } from "node:crypto";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { ondeLiberada } from "@/lib/empresas/situacao";
 import type { Evento } from "./eventos";
 
 /** Esperas (minutos) depois de cada tentativa que falhou. Depois da última, desiste. */
@@ -111,7 +112,8 @@ export async function processarWebhooks(agora = new Date()) {
     data: { status: "PENDENTE" },
   });
   const prontas = await db.entregaWebhook.findMany({
-    where: { status: "PENDENTE", proximaEm: { lte: agora }, webhook: { ativo: true } },
+    // Empresa suspensa ou com o teste vencido: os avisos esperam na fila.
+    where: { status: "PENDENTE", proximaEm: { lte: agora }, webhook: { ativo: true, organizacao: ondeLiberada(agora) } },
     orderBy: { proximaEm: "asc" },
     take: POR_RODADA,
     include: { webhook: true },

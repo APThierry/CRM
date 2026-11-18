@@ -14,6 +14,7 @@ import type { Conversa, TipoMensagem } from "@/generated/prisma/client";
 import { preencherVariaveis } from "@/lib/atendimento";
 import { aoResponderCampanha } from "@/lib/campanhas/status";
 import { db } from "@/lib/db";
+import { empresaLiberada } from "@/lib/empresas/situacao";
 import { enviarAutomatico } from "@/lib/whatsapp/enviar";
 import { lerAutomacao, textoDoMenu } from "./config";
 import { descreverHorarios, estaAberto } from "./horario";
@@ -47,6 +48,11 @@ export async function aoReceberDoCliente(m: Recebida) {
   // Campanhas: marca "respondeu" e trata o SAIR (descadastro). Quem saiu não recebe o chatbot.
   const saiu = await aoResponderCampanha({ organizacaoId, telefone: m.conversa.telefone, conteudo: m.conteudo, tipo: m.tipo });
   if (saiu) return;
+
+  // Empresa suspensa ou com o teste vencido: a mensagem fica gravada, mas o chatbot
+  // e o aviso de fora do horário não respondem. (O SAIR acima continua valendo.)
+  const empresa = await db.organizacao.findUnique({ where: { id: organizacaoId }, select: { situacao: true, testeAte: true } });
+  if (!empresa || !empresaLiberada(empresa, agora)) return;
 
   const config = await lerAutomacao(organizacaoId);
   if (!config || (!config.horarioAtivo && !config.botAtivo)) return;

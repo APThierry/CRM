@@ -9,6 +9,7 @@ import "server-only";
 // mudanças no CRM demoram um pouco para aparecer lá. É só leitura.
 import { createHash, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
+import { empresaLiberada } from "@/lib/empresas/situacao";
 
 const hash = (codigo: string) => createHash("sha256").update(codigo).digest("hex");
 
@@ -26,7 +27,8 @@ export async function desligarAgenda(usuarioId: string) {
 export async function usuarioDaAgenda(codigo: string) {
   if (!/^[\w-]{20,64}$/.test(codigo)) return null;
   const usuario = await db.usuario.findUnique({ where: { agendaTokenHash: hash(codigo) }, include: { organizacao: true } });
-  return usuario?.ativo ? usuario : null;
+  // Usuário desativado, ou empresa suspensa / com o teste vencido: a agenda some.
+  return usuario?.ativo && empresaLiberada(usuario.organizacao) ? usuario : null;
 }
 
 // --- Formato iCalendar (RFC 5545) -------------------------------------------

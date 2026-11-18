@@ -29,6 +29,9 @@ model Organizacao {
   telefone  String?
   email     String?
   criadoEm  DateTime @default(now())
+  // Fase F: várias empresas. Em teste até `testeAte`; suspensa = ninguém entra e a automação para.
+  situacao  SituacaoEmpresa @default(ATIVA)
+  testeAte  DateTime?
 
   usuarios      Usuario[]
   clientes      Cliente[]
@@ -51,6 +54,12 @@ model Organizacao {
   campanhas     Campanha[]
   descadastros  Descadastro[]
   webhooks      Webhook[]
+}
+
+enum SituacaoEmpresa {
+  EM_TESTE // período de teste (até testeAte)
+  ATIVA
+  SUSPENSA // ninguém entra; chatbot, agendamentos, campanhas e webhooks param
 }
 
 enum Papel {
@@ -377,7 +386,7 @@ model ConfiguracaoWhatsapp {
   id            String           @id @default(cuid())
   organizacaoId String           @unique
   provedor      ProvedorWhatsapp @default(EVOLUTION)
-  instancia     String? // nome da instância (Evolution) ou phone number id (Meta)
+  instancia     String?          @unique // nome da instância (Evolution) ou phone number id (Meta); uma por empresa
   apiUrl        String?
   apiToken      String? // TODO: guardar criptografado
   ativo         Boolean          @default(false)

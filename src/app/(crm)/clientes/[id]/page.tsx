@@ -7,7 +7,7 @@ import { Cabecalho, Carregando, Etiqueta, Vazio } from "@/components/ui";
 import { db } from "@/lib/db";
 import { data, dataHora, linkWhatsapp, moeda, normalizarWhatsapp, telefone } from "@/lib/formatar";
 import { getOrganizacaoAtual } from "@/lib/org";
-import { estadoConexao } from "@/lib/whatsapp/evolution";
+import { estadoDaEmpresa } from "@/lib/whatsapp/instancia";
 import { adicionarAtividade, alternarConclusao } from "../actions";
 import { ConversaWhatsapp } from "./conversa-whatsapp";
 
@@ -52,7 +52,7 @@ async function FichaCliente({ params }: { params: PageProps<"/clientes/[id]">["p
   const certificados = cliente.participantes.flatMap((p) => p.matriculas.map((m) => ({ ...m, participante: p.nome })));
   const hoje = new Date();
   const acaoAtividade = adicionarAtividade.bind(null, cliente.id);
-  const whatsapp = await estadoConexao();
+  const whatsapp = await estadoDaEmpresa(org.id);
 
   // Números de WhatsApp do cliente e dos contatos, sem repetir.
   const numeros = new Map<string, string>();

@@ -13,29 +13,31 @@ import {
   estadoConexao,
   garantirInstancia,
   gerarQrCode,
-  INSTANCIA,
 } from "@/lib/whatsapp/evolution";
+import { instanciaDaEmpresa } from "@/lib/whatsapp/instancia";
 import { obterConversa } from "@/lib/whatsapp/mensagens";
 
-/** Grava qual instância pertence à organização (usado pelo webhook). */
+/**
+ * Marca o WhatsApp da organização como ligado ou desligado e devolve o nome da
+ * instância dela (cada empresa tem a sua: src/lib/whatsapp/instancia.ts).
+ */
 async function registrarConfiguracao(organizacaoId: string, ativo: boolean) {
-  await db.configuracaoWhatsapp.upsert({
-    where: { organizacaoId },
-    create: { organizacaoId, provedor: "EVOLUTION", instancia: INSTANCIA, apiUrl: process.env.EVOLUTION_API_URL, ativo },
-    update: { instancia: INSTANCIA, apiUrl: process.env.EVOLUTION_API_URL, ativo },
-  });
+  const instancia = await instanciaDaEmpresa(organizacaoId);
+  await db.configuracaoWhatsapp.update({ where: { organizacaoId }, data: { apiUrl: process.env.EVOLUTION_API_URL, ativo } });
+  return instancia;
 }
 
 /** Consultado a cada poucos segundos pela tela de conexão. */
 export async function statusWhatsapp() {
-  return estadoConexao();
+  const org = await getOrganizacaoAtual();
+  return estadoConexao(await instanciaDaEmpresa(org.id));
 }
 
 export async function iniciarConexao(): Promise<{ qr?: string | null; erro?: string }> {
   const org = await getOrganizacaoAtual();
   try {
-    await registrarConfiguracao(org.id, true);
-    return { qr: await gerarQrCode() };
+    const instancia = await registrarConfiguracao(org.id, true);
+    return { qr: await gerarQrCode(instancia) };
   } catch (e) {
     return { erro: e instanceof ErroWhatsapp ? e.message : "Erro ao gerar o QR Code." };
   }
@@ -45,8 +47,7 @@ export async function iniciarConexao(): Promise<{ qr?: string | null; erro?: str
 export async function reconfigurar(): Promise<{ erro?: string }> {
   const org = await getOrganizacaoAtual();
   try {
-    await registrarConfiguracao(org.id, true);
-    await garantirInstancia();
+    await garantirInstancia(await registrarConfiguracao(org.id, true));
     return {};
   } catch (e) {
     return { erro: e instanceof ErroWhatsapp ? e.message : "Erro ao configurar." };
@@ -55,8 +56,8 @@ export async function reconfigurar(): Promise<{ erro?: string }> {
 
 export async function desconectarWhatsapp() {
   const org = await getOrganizacaoAtual();
-  await desconectar().catch(() => {});
-  await registrarConfiguracao(org.id, false);
+  const instancia = await registrarConfiguracao(org.id, false);
+  await desconectar(instancia).catch(() => {});
   refresh();
 }
 

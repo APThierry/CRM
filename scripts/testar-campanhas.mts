@@ -90,8 +90,8 @@ try {
   ok("mensagem aparece na conversa como 'campanha'", msg?.status === "campanha");
 
   console.log("Status, resposta e SAIR");
-  await registrarStatus({ keyId: c.destinatarios[0].idExterno, fromMe: true, status: "DELIVERY_ACK" });
-  await registrarStatus([{ keyId: c.destinatarios[0].idExterno, fromMe: true, status: "READ" }]);
+  await registrarStatus(org.id, { keyId: c.destinatarios[0].idExterno, fromMe: true, status: "DELIVERY_ACK" });
+  await registrarStatus(org.id, [{ keyId: c.destinatarios[0].idExterno, fromMe: true, status: "READ" }]);
   let d0 = await db.destinatarioCampanha.findUniqueOrThrow({ where: { id: c.destinatarios[0].id } });
   ok("entregue e lida registradas", d0.entregueEm && d0.lidaEm);
 

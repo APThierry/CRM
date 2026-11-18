@@ -9,6 +9,7 @@ import { preencherVariaveis } from "@/lib/atendimento";
 import { processarCampanhas } from "@/lib/campanhas/motor";
 import { db } from "@/lib/db";
 import { enviarAutomatico } from "@/lib/whatsapp/enviar";
+import { ondeLiberada } from "@/lib/empresas/situacao";
 import { ErroWhatsapp, garantirWebhook } from "@/lib/whatsapp/evolution";
 import { processarWebhooks } from "@/lib/webhooks/disparar";
 
@@ -25,7 +26,8 @@ export async function processarAgendadas(agora = new Date()) {
   });
 
   const vencidas = await db.mensagemAgendada.findMany({
-    where: { status: "PENDENTE", enviarEm: { lte: agora } },
+    // Empresa suspensa ou com o teste vencido: as agendadas esperam (saem se ela voltar).
+    where: { status: "PENDENTE", enviarEm: { lte: agora }, conversa: { organizacao: ondeLiberada(agora) } },
     orderBy: { enviarEm: "asc" },
     take: POR_RODADA,
     include: {
@@ -57,6 +59,11 @@ export async function processarAgendadas(agora = new Date()) {
     await new Promise((r) => setTimeout(r, PAUSA_ENTRE_ENVIOS));
   }
   return { enviadas, vistas: vencidas.length };
+}
+
+async function atualizarWebhooksWhatsapp() {
+  const configs = await db.configuracaoWhatsapp.findMany({ where: { ativo: true, instancia: { not: null } }, select: { instancia: true } });
+  for (const c of configs) await garantirWebhook(c.instancia!);
 }
 
 const global = globalThis as unknown as { relogioCrm?: NodeJS.Timeout };
@@ -93,7 +100,8 @@ export function iniciarRelogio() {
   global.relogioCrm = setInterval(rodada, INTERVALO);
   global.relogioCrm.unref?.();
   setTimeout(rodada, 5_000); // uma rodada logo depois de ligar
-  // Garante que a Evolution API manda também os avisos de entregue/lida (campanhas).
-  garantirWebhook().catch((e) => console.warn("[relógio] não consegui atualizar o webhook do WhatsApp:", e instanceof Error ? e.message : e));
+  // Garante que a Evolution API manda também os avisos de entregue/lida (campanhas),
+  // em cada número de WhatsApp (um por empresa).
+  atualizarWebhooksWhatsapp().catch((e) => console.warn("[relógio] não consegui atualizar o webhook do WhatsApp:", e instanceof Error ? e.message : e));
   console.log("[relógio] automação ligada: conferindo mensagens agendadas a cada 30 s");
 }

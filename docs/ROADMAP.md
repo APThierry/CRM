@@ -56,7 +56,7 @@
 - [ ] Dockerfile e docker-compose
 - [ ] Deploy na VPS com HTTPS
 - [ ] Backup automático
-- [ ] Cadastro de novas organizações (atender outros negócios)
+- [ ] Cadastro de novas organizações (atender outros negócios): virou a Fase F, veja docs/MULTIEMPRESA.md
 
 ## Plano "melhor que o Waseller"
 - [x] Fase A: Login e atendentes
@@ -107,3 +107,8 @@
   - [ ] Gráficos nos relatórios
   - [ ] Webhook para os negócios criados em lote pela reciclagem
   - [ ] Google Agenda com escrita (OAuth), se o link de assinatura não bastar
+- [ ] Fase F: Várias empresas no mesmo CRM (plano em docs/MULTIEMPRESA.md)
+  - [x] F1. Base: situação da empresa (teste, ativa, suspensa), um WhatsApp por empresa, empresa nova já com funil, teste de isolamento (scripts/testar-multiempresa.mts)
+  - [ ] F2. Cadastro público com confirmação por e-mail, "esqueci minha senha", proteção contra abuso e período de teste
+  - [ ] F3. Módulos por empresa: turmas e certificados opcionais, "Produtos e serviços", funil sugerido por ramo
+  - [ ] F4. Painel do dono do sistema: empresas, uso, suspender, ativar, liberar campanhas

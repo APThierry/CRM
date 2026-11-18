@@ -13,8 +13,8 @@ import { aoReceberDoCliente } from "@/lib/automacao/ao-receber";
 import { registrarStatus } from "@/lib/campanhas/status";
 import { salvarArquivo } from "@/lib/arquivos";
 import { db } from "@/lib/db";
-import { getOrganizacaoPadrao } from "@/lib/org";
 import { dispararEvento } from "@/lib/webhooks/disparar";
+import { empresaDaInstancia } from "@/lib/whatsapp/instancia";
 import { interpretarMensagem, registrarMensagem, type ConteudoWhatsapp } from "@/lib/whatsapp/mensagens";
 
 type MensagemRecebida = {
@@ -39,16 +39,20 @@ export async function POST(request: Request) {
   }
 
   const corpo = (await request.json().catch(() => null)) as { event?: string; instance?: string; data?: unknown } | null;
-  // Avisos de "entregue" e "lida": só interessam às campanhas (status de cada envio).
-  if (corpo?.event === "messages.update") return Response.json({ ok: true, atualizadas: await registrarStatus(corpo.data) });
   // O estado da conexão é consultado direto na tela do WhatsApp.
-  if (!corpo || corpo.event !== "messages.upsert") return Response.json({ ok: true });
+  if (!corpo || (corpo.event !== "messages.upsert" && corpo.event !== "messages.update")) return Response.json({ ok: true });
 
-  // Descobre a organização pela instância. Se não houver configuração, usa a organização padrão.
-  const config = corpo.instance
-    ? await db.configuracaoWhatsapp.findFirst({ where: { instancia: corpo.instance } })
-    : null;
-  const organizacaoId = config?.organizacaoId ?? (await getOrganizacaoPadrao()).id;
+  // Cada número de WhatsApp (instância) é de UMA empresa. Instância desconhecida
+  // é ignorada: nunca jogamos a mensagem numa empresa "padrão", senão uma empresa
+  // poderia ver a conversa de outra.
+  const organizacaoId = await empresaDaInstancia(corpo.instance);
+  if (!organizacaoId) {
+    console.warn(`[webhook] instância desconhecida: ${JSON.stringify(corpo.instance ?? null)}. Mensagem ignorada.`);
+    return Response.json({ ok: true, ignorada: "instância desconhecida" });
+  }
+
+  // Avisos de "entregue" e "lida": só interessam às campanhas (status de cada envio).
+  if (corpo.event === "messages.update") return Response.json({ ok: true, atualizadas: await registrarStatus(organizacaoId, corpo.data) });
 
   const mensagens = (Array.isArray(corpo.data) ? corpo.data : [corpo.data]) as MensagemRecebida[];
   let salvas = 0;

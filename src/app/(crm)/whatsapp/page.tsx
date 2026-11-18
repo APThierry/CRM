@@ -7,7 +7,7 @@ import { Suspense } from "react";
 import { Cabecalho, Carregando } from "@/components/ui";
 import { db } from "@/lib/db";
 import { getOrganizacaoAtual } from "@/lib/org";
-import { estadoConexao } from "@/lib/whatsapp/evolution";
+import { estadoDaEmpresa } from "@/lib/whatsapp/instancia";
 import { Conexao } from "./conexao";
 
 export const metadata: Metadata = { title: "WhatsApp" };
@@ -27,7 +27,7 @@ async function Conteudo() {
   await connection();
   const org = await getOrganizacaoAtual();
   const [estado, abertas, naoLidas, fila] = await Promise.all([
-    estadoConexao(),
+    estadoDaEmpresa(org.id),
     db.conversa.count({ where: { organizacaoId: org.id, status: "ABERTA" } }),
     db.conversa.count({ where: { organizacaoId: org.id, naoLidas: { gt: 0 } } }),
     db.conversa.count({ where: { organizacaoId: org.id, status: "ABERTA", atendenteId: null } }),
