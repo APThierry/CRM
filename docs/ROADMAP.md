@@ -29,7 +29,7 @@
 ## Fase 2 (Fase A do plano Waseller): Login e atendentes ✅
 - [x] Login com e-mail e senha (scrypt), sessões no banco, cookie HttpOnly
 - [x] Primeiro acesso: o administrador cria a própria senha
-- [x] Bloqueio após 5 senhas erradas (15 min)
+- [x] Bloqueio após 5 senhas erradas (15 min), por IP + e-mail (regras novas em docs/MULTIEMPRESA.md)
 - [x] Papéis (admin, gestor, vendedor, instrutor); tela Usuários só para admin
 - [x] Meu perfil: trocar nome e senha, ligar/desligar assinatura
 - [x] Assinatura do atendente no WhatsApp (*Nome:*) e autor de mensagens e atividades
@@ -110,5 +110,21 @@
 - [ ] Fase F: Várias empresas no mesmo CRM (plano em docs/MULTIEMPRESA.md)
   - [x] F1. Base: situação da empresa (teste, ativa, suspensa), um WhatsApp por empresa, empresa nova já com funil, teste de isolamento (scripts/testar-multiempresa.mts)
   - [x] F2. Cadastro público com confirmação por e-mail, "esqueci minha senha", proteção contra abuso, período de teste, campanhas só depois da aprovação e primeiros passos (scripts/testar-cadastro.mts)
+  - [x] Revisão de segurança antes da VPS (detalhes em docs/MULTIEMPRESA.md, "Segurança")
+    - [x] Webhooks só para sites públicos (SSRF, rebinding), sem ler o corpo da resposta
+    - [x] Login com tentativas reservadas, limites por IP, IP + e-mail e e-mail, aparelho conhecido e fila do scrypt
+    - [x] Primeiro acesso em produção só com SETUP_TOKEN, e script para dar acesso pelo terminal
+    - [x] Links só com APP_URL; IP só do cabeçalho confiável
+    - [x] Convites e cadastro em que a própria pessoa escolhe a senha; nada nasce antes da confirmação
+    - [x] Telas públicas não revelam quem tem conta
+    - [x] Teto de mensagens novas por dia para empresa não aprovada; tetos de agendadas, webhooks, usuários, arquivos e instâncias
+    - [x] Papéis: WhatsApp só administrador e gestor; turmas e certificados sem o vendedor
+    - [x] Relógio em rodízio entre as empresas, limpeza de avisos antigos, agendada com 24 h de atraso não sai
+    - [x] Certificado sem número repetido, cabeçalhos de segurança, seed não roda em produção
+    - [x] Testes: scripts/testar-seguranca.mts e scripts/testar-multiempresa.mts (com as Server Actions de verdade)
+    - [ ] Aviso na tela quando alguém sem permissão é mandado para o painel
+    - [ ] Esconder do menu o que o papel não abre (WhatsApp, Campanhas, Integrações)
+    - [ ] Verificação em duas etapas (TOTP) para administradores
+    - [ ] Content-Security-Policy completa (hoje só frame-ancestors e base-uri)
   - [ ] F3. Módulos por empresa: turmas e certificados opcionais, "Produtos e serviços", funil sugerido por ramo
   - [ ] F4. Painel do dono do sistema: empresas, uso, suspender, ativar, liberar campanhas

@@ -237,6 +237,7 @@ async function Conteudo() {
                     <td className="max-w-md py-2 pr-3">
                       <p className="line-clamp-2 text-slate-700">{a.texto}</p>
                       {a.status === "ERRO" && a.motivo && <p className="text-xs text-red-700">{a.motivo}</p>}
+                      {a.status === "PENDENTE" && a.motivo && <p className="text-xs text-amber-700">{a.motivo}</p>}
                     </td>
                     <td className="py-2 pr-3 text-xs text-slate-500">
                       {a.sequencia?.nome ?? "agendada"}

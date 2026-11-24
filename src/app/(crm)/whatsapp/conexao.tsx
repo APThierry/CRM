@@ -12,7 +12,7 @@ const textos: Record<Estado["estado"], { titulo: string; cor: string }> = {
   connecting: { titulo: "Aguardando leitura do QR Code", cor: "bg-amber-500" },
   close: { titulo: "Desconectado", cor: "bg-slate-400" },
   inexistente: { titulo: "Ainda não configurado", cor: "bg-slate-400" },
-  erro: { titulo: "Evolution API fora do ar", cor: "bg-red-500" },
+  erro: { titulo: "Serviço de WhatsApp fora do ar", cor: "bg-red-500" },
 };
 
 function formatarNumero(n?: string) {
@@ -110,7 +110,7 @@ export function Conexao({ inicial }: { inicial: Estado }) {
       {erro && <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">{erro}</p>}
       {estado.estado === "erro" && (
         <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">
-          O CRM não conseguiu falar com a Evolution API. Confira se ela está ligada (veja docs/WHATSAPP.md).
+          O CRM não conseguiu falar com o serviço de WhatsApp. Se continuar assim, avise o suporte.
         </p>
       )}
 

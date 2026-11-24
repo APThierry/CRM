@@ -3,6 +3,7 @@ import { refresh } from "next/cache";
 import { db } from "@/lib/db";
 import { getUsuarioAtual } from "@/lib/auth";
 import { getOrganizacaoAtual } from "@/lib/org";
+import { inteiro, lerValor, umaLinha } from "@/lib/validar";
 import { dadosNegocio, dispararComDados } from "@/lib/webhooks/disparar";
 
 /** Move um negócio para outra etapa (chamado ao arrastar o cartão no Kanban). */
@@ -49,9 +50,9 @@ export async function criarNegocio(formData: FormData) {
   ]);
   if (!cliente || !primeiraEtapa) throw new Error("Cliente ou funil não encontrados.");
 
-  const alunos = Number(formData.get("quantidadeAlunos")) || null;
-  const valor = Number(String(formData.get("valor") ?? "0").replace(/\./g, "").replace(",", ".")) || 0;
-  const titulo = String(formData.get("titulo") ?? "").trim() || `${servico?.nome ?? "Treinamento"} - ${cliente.nome}`;
+  const alunos = inteiro(formData.get("quantidadeAlunos"), 1, 1_000_000);
+  const valor = lerValor(formData.get("valor"));
+  const titulo = umaLinha(formData.get("titulo"), 200) || `${servico?.nome ?? "Treinamento"} - ${cliente.nome}`;
 
   const negocio = await db.negocio.create({
     data: {

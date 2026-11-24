@@ -68,6 +68,9 @@ async function Conteudo() {
           Se o outro sistema estiver fora do ar, tenta de novo até {MAX_TENTATIVAS} vezes (depois de 1 min, 5 min, 30 min, 2 h e 6 h).
           Como conferir a assinatura: <code>docs/INTEGRACOES.md</code>.
         </p>
+        <p className="text-sm text-slate-600">
+          O endereço precisa ser um site público com <strong>https://</strong> (porta 443 ou 8443). Endereços da rede interna e redirecionamentos não são aceitos.
+        </p>
         <details className="rounded-md border border-slate-200 p-3">
           <summary className="cursor-pointer text-sm font-medium">+ Novo webhook</summary>
           <div className="mt-3">

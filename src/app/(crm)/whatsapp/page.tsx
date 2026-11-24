@@ -1,4 +1,4 @@
-// Tela do WhatsApp: conexão do número da empresa.
+// Tela do WhatsApp: conexão do número da empresa (só administrador e gestor).
 // As conversas ficam na Central de atendimento (/atendimento).
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -6,7 +6,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { Cabecalho, Carregando } from "@/components/ui";
 import { db } from "@/lib/db";
-import { getOrganizacaoAtual } from "@/lib/org";
+import { exigirPapel } from "@/lib/auth";
 import { estadoDaEmpresa } from "@/lib/whatsapp/instancia";
 import { Conexao } from "./conexao";
 
@@ -25,7 +25,7 @@ export default function PaginaWhatsapp() {
 
 async function Conteudo() {
   await connection();
-  const org = await getOrganizacaoAtual();
+  const { organizacao: org } = await exigirPapel("ADMIN", "GESTOR");
   const [estado, abertas, naoLidas, fila] = await Promise.all([
     estadoDaEmpresa(org.id),
     db.conversa.count({ where: { organizacaoId: org.id, status: "ABERTA" } }),

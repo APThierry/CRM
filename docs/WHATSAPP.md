@@ -83,6 +83,8 @@ npm run dev             # 3. CRM (porta 3000)
 
 ## Conectar o número
 
+Só administrador e gestor conectam, reconfiguram e desconectam o número.
+
 1. No CRM, abra **WhatsApp** no menu.
 2. Clique em **Conectar WhatsApp**.
 3. No celular: **Aparelhos conectados → Conectar um aparelho** e leia o QR Code.
@@ -120,7 +122,9 @@ Tudo começa **desligado**. Só administrador e gestor mudam as configurações.
 - **Sequências de follow-up:** mensagens com tempo de espera (ex.: 1, 3 e 7 dias depois de iniciar). Iniciadas no painel da conversa. Se o cliente responder, o resto é cancelado. Com o horário de atendimento ligado, uma mensagem que cairia com a empresa fechada vai para a próxima abertura. Iniciar outra sequência na mesma conversa cancela a anterior.
 - **Fila de envios:** na tela Automação, o que ainda vai sair e o que deu erro (ex.: WhatsApp desconectado). Mensagens com erro não são reenviadas sozinhas.
 - **Mensagens automáticas** aparecem na conversa com "🤖 automática"; as agendadas, com o nome de quem agendou e "(agendada)".
-- **O relógio:** o próprio servidor do CRM confere a cada 30 segundos se há mensagem agendada vencida (`src/instrumentation.ts` liga o relógio). Com o CRM desligado, nada sai; quando ele volta, envia o que ficou atrasado.
+- **O relógio:** o próprio servidor do CRM confere a cada 30 segundos se há mensagem agendada vencida (`src/instrumentation.ts` liga o relógio). Com o CRM desligado, nada sai; quando ele volta, envia o que ficou atrasado até 24 horas. Mensagem com mais de 24 horas de atraso vira erro em vez de sair fora de hora (também vale para empresa que ficou suspensa).
+- **Várias empresas:** cada rodada é dividida entre elas em rodízio (até 40 mensagens por rodada, no máximo 15 de cada). Empresas enviam em paralelo, então um WhatsApp lento não segura os outros.
+- **Tetos:** 5000 mensagens agendadas esperando por empresa (200 se ela ainda não foi aprovada).
 
 ### Testar sem mandar mensagem para ninguém
 
@@ -131,6 +135,24 @@ WHATSAPP_SIMULAR_ENVIO="1"
 ```
 
 Com isso, tudo que o CRM "enviaria" fica registrado na conversa, mas nada sai para o WhatsApp. A tela Automação mostra um aviso amarelo enquanto o modo simulação está ligado. Apague o arquivo (e reinicie o `npm run dev`) para voltar a enviar de verdade.
+
+## Teto de mensagens novas (empresa ainda não aprovada)
+
+Quem se cadastra sozinho começa no máximo **50 mensagens por dia** (`ENVIOS_DIA_NAO_APROVADA`) até o dono do sistema aprovar a empresa. Conta tudo que a empresa **começa**: mensagem manual, anexo, agendada, sequência. **Não conta** responder quem escreveu nas últimas 24 horas, nem o chatbot e o aviso de fora do horário, que sempre respondem alguém.
+
+- Passou do teto: a tela explica; agendadas e sequências ficam para o dia seguinte, às 8h.
+- O WhatsApp recusou (a mensagem não saiu): a vaga volta. Na dúvida (demorou demais, erro 500), conta.
+- O dia vira à meia-noite de Brasília. A tela Primeiros passos mostra quanto já foi usado.
+- Empresa aprovada (`campanhasLiberadas`), como a Brigada MG, não tem esse teto.
+
+Todo envio passa por `src/lib/whatsapp/cota.ts`, que entrega um "passe"; as funções de envio da Evolution API só aceitam com ele. O contador sobe no banco numa instrução só, então envios ao mesmo tempo não passam do teto.
+
+## Arquivos e limites
+
+- **Espaço por empresa:** 10 GB (1 GB se ainda não aprovada). Acabou: anexos não saem (a tela explica) e mídias recebidas entram só como texto, com um aviso.
+- **Mídia recebida:** até 20 MB (`MIDIA_RECEBIDA_MB`). Acima disso entra só a mensagem, com um aviso para ver no celular.
+- **Anexo enviado:** até 16 MB.
+- **Números no servidor:** até 10 instâncias (`INSTANCIAS_WHATSAPP`). O CRM conta as que existem de verdade na Evolution API antes de criar outra. Uma empresa que se desconecta continua ocupando a vaga; para liberar, apague a instância na Evolution API.
 
 ## Campanhas (menu Campanhas)
 
@@ -194,7 +216,7 @@ O CRM pede à Evolution API também o evento `MESSAGES_UPDATE` (avisos de entreg
 npx tsx --conditions=react-server scripts/testar-campanhas.mts
 ```
 
-Roda 25 verificações no banco local **em modo simulação** (ritmo, horário, envio, entregue/lida, resposta, SAIR, reciclagem) e apaga tudo o que criou no fim.
+Roda 31 verificações num banco descartável, **em modo simulação** (ritmo, horário, envio, entregue/lida, resposta, SAIR, reciclagem, outra empresa intocada), e apaga o banco de teste no fim. Não toca nos seus dados.
 
 ## Variáveis do CRM (`.env`)
 
@@ -202,7 +224,7 @@ Roda 25 verificações no banco local **em modo simulação** (ritmo, horário, 
 |---|---|
 | `EVOLUTION_API_URL` | Endereço da Evolution API |
 | `EVOLUTION_API_KEY` | Chave de acesso (igual à `AUTHENTICATION_API_KEY` da Evolution) |
-| `EVOLUTION_INSTANCIA` | Só para o seed: nome da conexão da Brigada MG. Cada empresa tem a própria conexão, guardada no banco (`ConfiguracaoWhatsapp.instancia`, padrão `crm-<slug>`), e criada na tela WhatsApp |
+| `EVOLUTION_INSTANCIA` | Só para o seed: nome da conexão da Brigada MG. Cada empresa tem a própria conexão, guardada no banco (`ConfiguracaoWhatsapp.instancia`, padrão `crm-<slug>-<código sorteado>`; as que já existiam continuam com o nome antigo), e criada na tela WhatsApp |
 | `WHATSAPP_WEBHOOK_URL` | Endereço que a Evolution chama para entregar mensagens |
 | `WHATSAPP_WEBHOOK_SEGREDO` | Segredo enviado no cabeçalho `x-crm-segredo`; o CRM recusa chamadas sem ele |
 | `ARQUIVOS_DIR` | Pasta das mídias (padrão: `../crm-arquivos`, fora do projeto). Faça backup dela junto com o banco |
@@ -215,6 +237,7 @@ Roda 25 verificações no banco local **em modo simulação** (ritmo, horário, 
 |---|---|
 | `src/lib/whatsapp/evolution.ts` | Única parte que fala com a Evolution API (trocar de provedor = mudar só aqui) |
 | `src/lib/whatsapp/mensagens.ts` | Conversas: encontra o cliente pelo telefone, entende o tipo da mensagem e grava na conversa certa |
+| `src/lib/whatsapp/cota.ts` | Autoriza cada envio e aplica o teto diário das empresas não aprovadas |
 | `src/lib/whatsapp/enviar.ts` | Envio de texto e mídia (com assinatura); usado pela Central e pela ficha do cliente |
 | `src/lib/atendimento.ts` | Quem vê qual conversa e variáveis das respostas rápidas |
 | `src/lib/arquivos.ts` | Grava e lê as mídias em `ARQUIVOS_DIR` |

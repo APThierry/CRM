@@ -100,7 +100,14 @@ src/
     auth.ts            usuário logado (getUsuarioAtual) e papéis (exigirPapel)
     sessao.ts          criar/ler/encerrar sessões (cookie + tabela Sessao)
     senha.ts           hash e conferência de senhas (scrypt)
-    org.ts             organização do usuário logado; organização padrão para o webhook
+    org.ts             organização do usuário logado
+    conta.ts           links por e-mail: criar conta, convite e nova senha
+    limite.ts          limites de tentativas (memória) e IP de quem acessa
+    login-protecao.ts  limites do login e aparelho conhecido
+    primeiro-acesso.ts quando o primeiro administrador pode ser criado sem login
+    ambiente.ts        tetos e configurações lidas do .env
+    validar.ts         e-mail, textos de uma linha, tamanhos
+    trava.ts           trava do banco para uma coisa de cada vez (por empresa)
     formatar.ts        moeda, datas, CPF, telefone e link do WhatsApp
     certificados.ts    validade, numeração e situação dos certificados
     atendimento.ts     quem vê qual conversa (vendedor x gestor)
@@ -125,8 +132,9 @@ docs/                  esta documentação
 - **`src/proxy.ts`** só confere se o cookie existe (rápido). A conferência de verdade é no servidor: `getUsuarioAtual()` procura a sessão no banco e, se não houver, redireciona para `/login`.
 - **Toda Server Action** chama `getUsuarioAtual()` ou `getOrganizacaoAtual()`, então nenhuma gravação acontece sem login, mesmo que alguém chame a action direto.
 - **Ações restritas** usam `exigirPapel("ADMIN")`.
-- **Sessão:** o cookie `crm_sessao` guarda um código aleatório; a tabela `Sessao` guarda só o SHA-256 dele. Desativar um usuário ou redefinir a senha apaga as sessões, desconectando na hora.
-- **Webhook do WhatsApp** fica fora do login (tem o próprio segredo) e usa `getOrganizacaoPadrao()`.
+- **Sessão:** o cookie `crm_sessao` guarda um código aleatório; a tabela `Sessao` guarda só o SHA-256 dele. Desativar um usuário ou trocar a senha apaga as sessões, desconectando na hora.
+- **Senhas:** ninguém define a senha de outra pessoa. Cadastro, convite e "esqueci minha senha" mandam um link; a pessoa escolhe a própria senha. Veja [MULTIEMPRESA.md](MULTIEMPRESA.md).
+- **Webhook do WhatsApp** fica fora do login (tem o próprio segredo). A instância diz de qual empresa é a mensagem; instância desconhecida é ignorada.
 - **Central de atendimento:** `conversasVisiveis(eu)` (em `src/lib/atendimento.ts`) é o filtro usado em toda consulta e action de conversa. Vendedor e instrutor: fila + as suas. Gestor e admin: todas.
 - **Mídias:** a rota `/api/arquivos/...` exige sessão e só lê arquivos da pasta da organização do usuário (recusa `..`).
 - **Automação:** o webhook grava a mensagem, responde à Evolution API e só depois (com `after()`) roda o chatbot e o aviso de fora do horário. O relógio (`src/lib/automacao/relogio.ts`) roda dentro do servidor a cada 30 s; cada mensagem agendada é "reservada" (PENDENTE → ENVIANDO) antes de sair, para nunca ser enviada duas vezes. Rode **um** processo do CRM (ou use `AUTOMACAO_DESLIGADA=1` nos outros).

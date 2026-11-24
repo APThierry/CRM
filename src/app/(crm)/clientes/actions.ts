@@ -8,13 +8,11 @@ import { db } from "@/lib/db";
 import { normalizarWhatsapp } from "@/lib/formatar";
 import { getUsuarioAtual } from "@/lib/auth";
 import { getOrganizacaoAtual } from "@/lib/org";
+import { opcional } from "@/lib/validar";
 import { dadosCliente, dispararComDados } from "@/lib/webhooks/disparar";
 import type { TipoAtividade } from "@/generated/prisma/client";
 
-const texto = (f: FormData, campo: string) => {
-  const v = String(f.get(campo) ?? "").trim();
-  return v === "" ? null : v;
-};
+const texto = (f: FormData, campo: string, maximo = 200) => opcional(f.get(campo), maximo);
 
 export async function criarCliente(formData: FormData) {
   const eu = await getUsuarioAtual();
@@ -22,7 +20,7 @@ export async function criarCliente(formData: FormData) {
   const nome = texto(formData, "nome");
   if (!nome) throw new Error("O nome do cliente é obrigatório.");
 
-  const whatsapp = normalizarWhatsapp(texto(formData, "whatsapp"));
+  const whatsapp = normalizarWhatsapp(texto(formData, "whatsapp", 30));
   const nomeContato = texto(formData, "contatoNome");
 
   const cliente = await db.cliente.create({
@@ -32,15 +30,15 @@ export async function criarCliente(formData: FormData) {
       tipo: formData.get("tipo") === "PF" ? "PF" : "PJ",
       nome,
       nomeFantasia: texto(formData, "nomeFantasia"),
-      documento: texto(formData, "documento"),
-      telefone: texto(formData, "telefone"),
+      documento: texto(formData, "documento", 30),
+      telefone: texto(formData, "telefone", 30),
       whatsapp,
-      email: texto(formData, "email"),
+      email: texto(formData, "email", 254),
       cidade: texto(formData, "cidade"),
-      uf: texto(formData, "uf")?.toUpperCase(),
+      uf: texto(formData, "uf", 2)?.toUpperCase(),
       segmento: texto(formData, "segmento"),
       origem: texto(formData, "origem"),
-      observacoes: texto(formData, "observacoes"),
+      observacoes: texto(formData, "observacoes", 5000),
       contatos: nomeContato
         ? {
             create: {
@@ -67,10 +65,10 @@ export async function adicionarAtividade(clienteId: string, formData: FormData) 
   const cliente = await db.cliente.findFirst({ where: { id: clienteId, organizacaoId: org.id } });
   if (!cliente) throw new Error("Cliente não encontrado.");
 
-  const descricao = texto(formData, "descricao");
+  const descricao = texto(formData, "descricao", 5000);
   if (!descricao) return;
   const tipo = TIPOS.find((t) => t === formData.get("tipo")) ?? "NOTA";
-  const quando = texto(formData, "agendadaPara");
+  const quando = texto(formData, "agendadaPara", 10);
 
   await db.atividade.create({
     data: {

@@ -1,32 +1,31 @@
 "use server";
 // Gravações de turmas, inscrições e certificados.
-// Toda action confere se a turma/matrícula pertence à organização atual.
+// Toda action confere o papel (administrador, gestor ou instrutor) e se a
+// turma/matrícula pertence à organização atual.
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
-import { calcularValidade, proximoNumeroCertificado } from "@/lib/certificados";
+import { exigirCuidadoDeTurmas } from "@/lib/auth";
+import { calcularValidade, emitirCertificado } from "@/lib/certificados";
 import { db } from "@/lib/db";
 import { deInputData } from "@/lib/formatar";
-import { getOrganizacaoAtual } from "@/lib/org";
+import { inteiro, opcional } from "@/lib/validar";
 import { dadosCertificado, dispararComDados } from "@/lib/webhooks/disparar";
 import type { Modalidade, StatusTurma } from "@/generated/prisma/client";
 
-const texto = (f: FormData, campo: string) => {
-  const v = String(f.get(campo) ?? "").trim();
-  return v === "" ? null : v;
-};
+const texto = (f: FormData, campo: string, maximo = 200) => opcional(f.get(campo), maximo);
 
 const MODALIDADES: Modalidade[] = ["PRESENCIAL", "EAD", "HIBRIDO"];
 const STATUS: StatusTurma[] = ["PLANEJADA", "CONFIRMADA", "REALIZADA", "CANCELADA"];
 
 async function turmaDaOrganizacao(turmaId: string) {
-  const org = await getOrganizacaoAtual();
+  const { organizacao: org } = await exigirCuidadoDeTurmas();
   const turma = await db.turma.findFirst({ where: { id: turmaId, organizacaoId: org.id }, include: { servico: true } });
   if (!turma) throw new Error("Turma não encontrada.");
   return { org, turma };
 }
 
 async function matriculaDaOrganizacao(matriculaId: string) {
-  const org = await getOrganizacaoAtual();
+  const { organizacao: org } = await exigirCuidadoDeTurmas();
   const matricula = await db.matricula.findFirst({
     where: { id: matriculaId, turma: { organizacaoId: org.id } },
     include: { turma: { include: { servico: true } } },
@@ -37,7 +36,8 @@ async function matriculaDaOrganizacao(matriculaId: string) {
 
 /** Cria (turmaId = null) ou edita uma turma. */
 export async function salvarTurma(turmaId: string | null, formData: FormData) {
-  const org = await getOrganizacaoAtual();
+  const { organizacao: org } = await exigirCuidadoDeTurmas();
+  if (turmaId) await turmaDaOrganizacao(turmaId); // a turma é desta empresa?
 
   const servicoId = String(formData.get("servicoId") ?? "");
   const servico = await db.servico.findFirst({ where: { id: servicoId, organizacaoId: org.id } });
@@ -61,15 +61,14 @@ export async function salvarTurma(turmaId: string | null, formData: FormData) {
     dataInicio,
     dataFim: deInputData(texto(formData, "dataFim")),
     local: texto(formData, "local"),
-    vagas: Number(formData.get("vagas")) || null,
+    vagas: inteiro(formData.get("vagas"), 1, 10_000),
     modalidade: MODALIDADES.find((m) => m === formData.get("modalidade")) ?? "PRESENCIAL",
     status: STATUS.find((s) => s === formData.get("status")) ?? "PLANEJADA",
-    observacoes: texto(formData, "observacoes"),
+    observacoes: texto(formData, "observacoes", 5000),
   };
 
   let id = turmaId;
   if (turmaId) {
-    await turmaDaOrganizacao(turmaId);
     const turma = await db.turma.update({ where: { id: turmaId }, data: dados });
     // Se a data ou o curso mudaram, recalcula a validade dos aprovados.
     const validade = calcularValidade(turma, servico.validadeMeses);
@@ -95,7 +94,7 @@ export async function inscreverParticipante(turmaId: string, formData: FormData)
   const { org, turma } = await turmaDaOrganizacao(turmaId);
   const nome = texto(formData, "nome");
   if (!nome) return;
-  const cpf = texto(formData, "cpf")?.replace(/\D/g, "") || null;
+  const cpf = texto(formData, "cpf", 30)?.replace(/\D/g, "") || null;
 
   const clienteIdForm = texto(formData, "clienteId");
   const cliente = clienteIdForm
@@ -110,8 +109,8 @@ export async function inscreverParticipante(turmaId: string, formData: FormData)
         organizacaoId: org.id,
         nome,
         cpf,
-        telefone: texto(formData, "telefone"),
-        email: texto(formData, "email"),
+        telefone: texto(formData, "telefone", 30),
+        email: texto(formData, "email", 254),
         clienteId,
       },
     });
@@ -148,17 +147,11 @@ export async function definirResultado(matriculaId: string, aprovado: boolean | 
   const { org, matricula } = await matriculaDaOrganizacao(matriculaId);
 
   if (aprovado) {
-    await db.matricula.update({
-      where: { id: matriculaId },
-      data: {
-        aprovado: true,
-        presente: true,
-        validadeAte: calcularValidade(matricula.turma, matricula.turma.servico.validadeMeses),
-        certificadoNumero: matricula.certificadoNumero ?? (await proximoNumeroCertificado(org)),
-        emitidoEm: matricula.emitidoEm ?? new Date(),
-      },
+    const novo = await emitirCertificado(org, matriculaId, {
+      presente: true,
+      validadeAte: calcularValidade(matricula.turma, matricula.turma.servico.validadeMeses),
     });
-    if (!matricula.certificadoNumero) await dispararComDados(org.id, "certificado.emitido", () => dadosCertificado(matriculaId));
+    if (novo) await dispararComDados(org.id, "certificado.emitido", () => dadosCertificado(matriculaId));
   } else {
     await db.matricula.update({ where: { id: matriculaId }, data: { aprovado, validadeAte: null } });
   }
@@ -174,16 +167,8 @@ export async function concluirTurma(turmaId: string) {
   });
   const validade = calcularValidade(turma, turma.servico.validadeMeses);
   for (const m of pendentes) {
-    await db.matricula.update({
-      where: { id: m.id },
-      data: {
-        aprovado: true,
-        validadeAte: validade,
-        certificadoNumero: m.certificadoNumero ?? (await proximoNumeroCertificado(org)),
-        emitidoEm: m.emitidoEm ?? new Date(),
-      },
-    });
-    if (!m.certificadoNumero) await dispararComDados(org.id, "certificado.emitido", () => dadosCertificado(m.id));
+    const novo = await emitirCertificado(org, m.id, { validadeAte: validade });
+    if (novo) await dispararComDados(org.id, "certificado.emitido", () => dadosCertificado(m.id));
   }
   await db.turma.update({ where: { id: turmaId }, data: { status: "REALIZADA" } });
   refresh();

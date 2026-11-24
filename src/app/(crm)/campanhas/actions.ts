@@ -13,8 +13,8 @@ import { AVISO_CAMPANHAS_BLOQUEADAS, campanhasLiberadas } from "@/lib/campanhas/
 import { prepararReciclagem } from "@/lib/campanhas/reciclagem";
 import { db } from "@/lib/db";
 import { chaveTelefone, normalizarWhatsapp } from "@/lib/formatar";
-import { enviarTexto, ErroWhatsapp } from "@/lib/whatsapp/evolution";
-import { instanciaDaEmpresa } from "@/lib/whatsapp/instancia";
+import { enviarAvulso } from "@/lib/whatsapp/enviar";
+import { ErroWhatsapp } from "@/lib/whatsapp/evolution";
 
 export type Resultado = { erro?: string; ok?: string } | null;
 const campo = (f: FormData, nome: string) => String(f.get(nome) ?? "").replace(/\r\n?/g, "\n").trim();
@@ -130,7 +130,7 @@ export async function enviarTeste(id: string, _estado: Resultado, formData: Form
   const texto = montarTexto(campanha.texto, { nome: exemplo?.nome ?? eu.nome, variaveis: exemplo?.variaveis ?? null }, eu.organizacao.nome);
   try {
     // Teste: vai direto para o número, sem entrar na Central de atendimento.
-    await enviarTexto(await instanciaDaEmpresa(campanha.organizacaoId), numero!, `*[TESTE]*\n${texto}`);
+    await enviarAvulso(campanha.organizacaoId, numero!, `*[TESTE]*\n${texto}`);
   } catch (e) {
     return { erro: e instanceof ErroWhatsapp ? e.message : "Não foi possível enviar o teste." };
   }

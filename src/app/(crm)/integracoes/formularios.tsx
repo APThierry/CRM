@@ -39,7 +39,7 @@ export function FormNovoWebhook() {
         </div>
         <div>
           <label className="rotulo" htmlFor="url">Endereço (URL) *</label>
-          <input id="url" name="url" type="url" required placeholder="https://..." className="campo" />
+          <input id="url" name="url" type="url" required maxLength={500} placeholder="https://..." className="campo" />
         </div>
       </div>
       <CaixasEventos marcados={["negocio.ganho"]} />
@@ -55,7 +55,7 @@ export function FormEditarWebhook({ id, url, eventos }: { id: string; url: strin
     <form action={acao} className="space-y-3">
       <div>
         <label className="rotulo" htmlFor={`url-${id}`}>Endereço (URL)</label>
-        <input id={`url-${id}`} name="url" type="url" required defaultValue={url} className="campo" />
+        <input id={`url-${id}`} name="url" type="url" required maxLength={500} defaultValue={url} className="campo" />
       </div>
       <CaixasEventos marcados={eventos} />
       <Aviso estado={estado} />

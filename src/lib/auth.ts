@@ -45,3 +45,10 @@ export async function exigirPapel(...papeis: Papel[]) {
 }
 
 export const podeGerenciarUsuarios = (papel: Papel) => papel === "ADMIN";
+
+/** Conectar, reconfigurar e desconectar o número de WhatsApp da empresa. */
+export const podeConectarWhatsapp = (papel: Papel) => papel === "ADMIN" || papel === "GESTOR";
+
+/** Criar e alterar turmas, inscrições, presença, resultado e certificados. */
+export const podeCuidarDeTurmas = (papel: Papel) => papel === "ADMIN" || papel === "GESTOR" || papel === "INSTRUTOR";
+export const exigirCuidadoDeTurmas = () => exigirPapel("ADMIN", "GESTOR", "INSTRUTOR");

@@ -3,6 +3,7 @@
 //
 // Sem "server-only" e com imports relativos, para o seed (prisma/seed.ts) e os
 // scripts também poderem usar. Recebe o cliente do banco (ou uma transação).
+import { randomBytes } from "node:crypto";
 import type { Prisma, PrismaClient } from "../../generated/prisma/client";
 import { AUTOMACAO_PADRAO, OPCOES_BOT_PADRAO } from "../automacao/padroes";
 import { ETIQUETAS_PADRAO, RESPOSTAS_PADRAO } from "../padroes-atendimento";
@@ -21,8 +22,12 @@ export const ETAPAS_PADRAO: EtapaInicial[] = [
   { nome: "Perdido", cor: "#dc2626", tipo: "PERDIDO" },
 ];
 
-/** Nome da instância na Evolution API. Um número de WhatsApp por empresa. */
-export const nomeInstancia = (slug: string) => `crm-${slug}`;
+/**
+ * Nome da instância na Evolution API (um número de WhatsApp por empresa). O final é
+ * sorteado: ninguém adivinha o nome a partir da empresa, e uma empresa apagada e criada
+ * de novo não herda a conexão da antiga.
+ */
+export const nomeInstancia = (slug: string) => `crm-${slug}-${randomBytes(5).toString("hex")}`;
 
 /** "Clínica São José Ltda." -> "clinica-sao-jose-ltda" */
 export function gerarSlug(nome: string) {

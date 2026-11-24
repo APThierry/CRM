@@ -11,7 +11,8 @@ import { timingSafeEqual } from "node:crypto";
 import { after } from "next/server";
 import { aoReceberDoCliente } from "@/lib/automacao/ao-receber";
 import { registrarStatus } from "@/lib/campanhas/status";
-import { salvarArquivo } from "@/lib/arquivos";
+import { LIMITES } from "@/lib/ambiente";
+import { guardarRecebido } from "@/lib/arquivos";
 import { db } from "@/lib/db";
 import { dispararEvento } from "@/lib/webhooks/disparar";
 import { empresaDaInstancia } from "@/lib/whatsapp/instancia";
@@ -24,6 +25,14 @@ type MensagemRecebida = {
   messageTimestamp?: number | string;
 };
 
+function lerJson(texto: string): unknown {
+  try {
+    return JSON.parse(texto);
+  } catch {
+    return null;
+  }
+}
+
 /** Confere o segredo enviado no cabeçalho, para recusar chamadas de terceiros. */
 function segredoValido(recebido: string | null) {
   const esperado = process.env.WHATSAPP_WEBHOOK_SEGREDO ?? "";
@@ -33,12 +42,39 @@ function segredoValido(recebido: string | null) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+/** Lê o corpo até o limite. Maior que isso = null (não carrega tudo na memória). */
+async function lerCorpo(request: Request, maximo: number) {
+  if (Number(request.headers.get("content-length") ?? 0) > maximo) return null;
+  const partes: Uint8Array[] = [];
+  let total = 0;
+  const leitor = request.body?.getReader();
+  while (leitor) {
+    const { done, value } = await leitor.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maximo) {
+      await leitor.cancel();
+      return null;
+    }
+    partes.push(value);
+  }
+  return Buffer.concat(partes).toString("utf8");
+}
+
 export async function POST(request: Request) {
   if (!segredoValido(request.headers.get("x-crm-segredo"))) {
     return Response.json({ erro: "não autorizado" }, { status: 401 });
   }
 
-  const corpo = (await request.json().catch(() => null)) as { event?: string; instance?: string; data?: unknown } | null;
+  // Mídia em base64 ocupa 4/3 do tamanho. A folga é para documentos um pouco acima do
+  // limite: esses entram como mensagem, só sem o arquivo. Muito acima, recusamos com 422
+  // (a Evolution API não tenta de novo).
+  const texto = await lerCorpo(request, LIMITES.midiaRecebidaMb() * 4 * 1024 * 1024 + 1024 * 1024);
+  if (texto === null) {
+    console.warn("[webhook] aviso do WhatsApp grande demais, ignorado");
+    return Response.json({ erro: "grande demais" }, { status: 422 });
+  }
+  const corpo = lerJson(texto) as { event?: string; instance?: string; data?: unknown } | null;
   // O estado da conexão é consultado direto na tela do WhatsApp.
   if (!corpo || (corpo.event !== "messages.upsert" && corpo.event !== "messages.update")) return Response.json({ ok: true });
 
@@ -72,12 +108,12 @@ export async function POST(request: Request) {
 
     let arquivo: string | null = null;
     if (lida.base64) {
-      arquivo = await salvarArquivo(organizacaoId, Buffer.from(lida.base64, "base64"), lida.mimetype, lida.nomeArquivo).catch(
-        (e) => {
-          console.error("[webhook] não consegui gravar a mídia:", e);
-          return null;
-        },
-      );
+      const r = await guardarRecebido(organizacaoId, lida.base64, lida.mimetype, lida.nomeArquivo).catch((e) => {
+        console.error("[webhook] não consegui gravar a mídia:", e);
+        return { caminho: undefined, motivo: "erro ao guardar o arquivo" };
+      });
+      arquivo = r.caminho ?? null;
+      if (r.motivo) lida.conteudo = `${lida.conteudo}\n(${r.motivo}: não foi guardado, veja no celular)`;
     }
 
     const quando = Number(m.messageTimestamp);

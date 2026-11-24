@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { Cabecalho, Carregando, Etiqueta, Vazio } from "@/components/ui";
 import { db } from "@/lib/db";
 import { data, dataHora, linkWhatsapp, moeda, normalizarWhatsapp, telefone } from "@/lib/formatar";
-import { getOrganizacaoAtual } from "@/lib/org";
+import { getUsuarioAtual, podeConectarWhatsapp, podeCuidarDeTurmas } from "@/lib/auth";
 import { estadoDaEmpresa } from "@/lib/whatsapp/instancia";
 import { adicionarAtividade, alternarConclusao } from "../actions";
 import { ConversaWhatsapp } from "./conversa-whatsapp";
@@ -32,7 +32,7 @@ export default function PaginaCliente({ params }: PageProps<"/clientes/[id]">) {
 async function FichaCliente({ params }: { params: PageProps<"/clientes/[id]">["params"] }) {
   await connection();
   const { id } = await params;
-  const org = await getOrganizacaoAtual();
+  const { organizacao: org, papel } = await getUsuarioAtual();
 
   const cliente = await db.cliente.findFirst({
     where: { id, organizacaoId: org.id },
@@ -77,7 +77,7 @@ async function FichaCliente({ params }: { params: PageProps<"/clientes/[id]">["p
                 💬 Abrir no WhatsApp
               </a>
             )}
-            <Link href={`/turmas/nova?cliente=${cliente.id}`} className="botao-secundario">+ Agendar turma</Link>
+            {podeCuidarDeTurmas(papel) && <Link href={`/turmas/nova?cliente=${cliente.id}`} className="botao-secundario">+ Agendar turma</Link>}
             <Link href="/clientes" className="botao-secundario">Voltar</Link>
           </>
         }
@@ -182,6 +182,7 @@ async function FichaCliente({ params }: { params: PageProps<"/clientes/[id]">["p
               empresa={org.nome}
               clienteId={cliente.id}
               conectado={whatsapp.estado === "open"}
+              podeConectar={podeConectarWhatsapp(papel)}
               numeros={[...numeros].map(([valor, rotulo]) => ({ valor, rotulo }))}
               mensagens={cliente.mensagens
                 .toReversed()

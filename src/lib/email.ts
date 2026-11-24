@@ -4,13 +4,16 @@ import "server-only";
 // (Brevo, Resend, Amazon SES, o e-mail do domínio...). Veja docs/MULTIEMPRESA.md.
 //
 // Sem SMTP_HOST no .env (no seu computador), nada sai: o e-mail aparece no
-// terminal do `npm run dev`, com o link, para você testar.
+// terminal do `npm run dev`, com o link, para você testar. Em produção o link NUNCA
+// vai para o terminal (quem lê os registros entraria na conta): sem SMTP, dá erro.
 import nodemailer from "nodemailer";
+import { emProducao } from "@/lib/ambiente";
 import { nomeDoApp } from "@/lib/url";
+import { emailValido, normalizarEmail, umaLinha } from "@/lib/validar";
 
 export type Email = { para: string; assunto: string; texto: string; html?: string };
 
-/** Últimos e-mails "enviados" sem SMTP (os scripts de teste leem daqui). */
+/** Últimos e-mails "enviados" sem SMTP, fora de produção (os scripts de teste leem daqui). */
 export const caixaDeSaida: Email[] = [];
 
 const global = globalThis as unknown as { transporteEmail?: nodemailer.Transporter };
@@ -22,14 +25,22 @@ function transporte() {
     port: Number(process.env.SMTP_PORTA ?? 587),
     secure: Number(process.env.SMTP_PORTA ?? 587) === 465,
     auth: process.env.SMTP_USUARIO ? { user: process.env.SMTP_USUARIO, pass: process.env.SMTP_SENHA ?? "" } : undefined,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
+    disableFileAccess: true,
+    disableUrlAccess: true,
   });
   return global.transporteEmail;
 }
 
 /** Envia (ou mostra no terminal). Lança erro se o servidor de e-mail recusar. */
 export async function enviarEmail(email: Email) {
+  // Um destinatário só: "a@x.com, b@y.com" mandaria o link para duas pessoas.
+  if (!emailValido(normalizarEmail(email.para))) throw new Error("destinatário inválido");
   const t = transporte();
   if (!t) {
+    if (emProducao()) throw new Error("SMTP não configurado");
     caixaDeSaida.push(email);
     if (caixaDeSaida.length > 50) caixaDeSaida.shift();
     console.log(`\n[e-mail não enviado: falta SMTP_HOST no .env]\nPara: ${email.para}\nAssunto: ${email.assunto}\n\n${email.texto}\n`);
@@ -37,8 +48,8 @@ export async function enviarEmail(email: Email) {
   }
   await t.sendMail({
     from: process.env.EMAIL_REMETENTE ?? `${nomeDoApp()} <nao-responda@localhost>`,
-    to: email.para,
-    subject: email.assunto,
+    to: { name: "", address: email.para },
+    subject: umaLinha(email.assunto, 200),
     text: email.texto,
     html: email.html,
   });

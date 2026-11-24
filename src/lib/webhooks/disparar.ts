@@ -12,17 +12,24 @@ import "server-only";
 //   X-CRM-Entrega:    id da entrega (o mesmo nas novas tentativas: use para não processar duas vezes)
 //   X-CRM-Timestamp:  segundos desde 1970
 //   X-CRM-Assinatura: sha256=HMAC_SHA256(segredo, timestamp + "." + corpo) em hexadecimal
+//
+// Segurança da conexão (para onde pode apontar, DNS, tempo): ./destino.ts e ./requisicao.ts.
 import { createHmac, randomBytes } from "node:crypto";
 import type { Prisma } from "@/generated/prisma/client";
+import { LIMITES } from "@/lib/ambiente";
+import { cotaPorEmpresa, emParalelo, escolherEmpresas } from "@/lib/automacao/rodizio";
 import { db } from "@/lib/db";
 import { ondeLiberada } from "@/lib/empresas/situacao";
 import type { Evento } from "./eventos";
+import { postar, type Consulta } from "./requisicao";
 
 /** Esperas (minutos) depois de cada tentativa que falhou. Depois da última, desiste. */
 export const ESPERAS_MINUTOS = [1, 5, 30, 120, 360];
 export const MAX_TENTATIVAS = ESPERAS_MINUTOS.length + 1;
-const TEMPO_LIMITE_MS = 10_000;
-const POR_RODADA = 20;
+/** Entregas por rodada, divididas entre as empresas que têm avisos na fila. */
+export const POR_RODADA = 20;
+/** Avisos entregues (ou desistidos) são apagados depois destes dias. */
+export const DIAS_GUARDADOS = 30;
 
 export const novoSegredo = () => `whsec_${randomBytes(24).toString("base64url")}`;
 
@@ -34,6 +41,12 @@ export async function dispararEvento(organizacaoId: string, evento: Evento, dado
       select: { id: true },
     });
     if (!webhooks.length) return 0;
+    // Teto por empresa: um sistema fora do ar há dias não enche o banco.
+    const naFila = await db.entregaWebhook.count({ where: { webhook: { organizacaoId }, status: { in: ["PENDENTE", "ENVIANDO"] } } });
+    if (naFila + webhooks.length > LIMITES.avisosPendentes()) {
+      console.warn(`[webhooks] fila cheia (${naFila} avisos esperando) na empresa ${organizacaoId}: evento ${evento} não registrado`);
+      return 0;
+    }
     await db.entregaWebhook.createMany({
       data: webhooks.map((w) => ({ webhookId: w.id, evento, payload: dados })),
     });
@@ -54,34 +67,29 @@ type Entrega = Prisma.EntregaWebhookGetPayload<{ include: { webhook: true } }>;
  * Faz uma tentativa de entrega e grava o resultado. Devolve true se o outro
  * sistema aceitou (resposta 2xx). `unica`: não agenda nova tentativa (teste).
  */
-export async function entregar(entrega: Entrega, agora = new Date(), unica = false) {
+export async function entregar(entrega: Entrega, agora = new Date(), unica = false, consulta?: Consulta) {
   const { webhook } = entrega;
   const corpo = JSON.stringify({ id: entrega.id, evento: entrega.evento, criadoEm: entrega.criadoEm.toISOString(), dados: entrega.payload });
   const timestamp = Math.floor(agora.getTime() / 1000);
   const tentativas = entrega.tentativas + 1;
 
-  let codigo: number | null = null;
-  let erro: string | null = null;
-  try {
-    const resposta = await fetch(webhook.url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent": "CRM-Webhooks/1.0",
-        "X-CRM-Evento": entrega.evento,
-        "X-CRM-Entrega": entrega.id,
-        "X-CRM-Timestamp": String(timestamp),
-        "X-CRM-Assinatura": assinar(webhook.segredo, timestamp, corpo),
-      },
-      body: corpo,
-      redirect: "manual", // não segue redirecionamentos para outro endereço
-      signal: AbortSignal.timeout(TEMPO_LIMITE_MS),
-    });
-    codigo = resposta.status;
-    if (!resposta.ok) erro = `respondeu ${resposta.status} ${(await resposta.text().catch(() => "")).slice(0, 200)}`.trim();
-  } catch (e) {
-    erro = e instanceof Error ? (e.name === "TimeoutError" ? "não respondeu em 10 segundos" : e.message) : "erro desconhecido";
-  }
+  // Só o código da resposta interessa: o corpo nunca é lido, gravado nem mostrado.
+  const resposta = await postar(webhook.url, {
+    corpo,
+    consulta,
+    cabecalhos: {
+      "Content-Type": "application/json",
+      "User-Agent": "CRM-Webhooks/1.0",
+      "X-CRM-Evento": entrega.evento,
+      "X-CRM-Entrega": entrega.id,
+      "X-CRM-Timestamp": String(timestamp),
+      "X-CRM-Assinatura": assinar(webhook.segredo, timestamp, corpo),
+    },
+  });
+  const codigo = resposta.codigo ?? null;
+  const aceitou = codigo !== null && codigo >= 200 && codigo < 300;
+  const redirecionou = codigo !== null && codigo >= 300 && codigo < 400;
+  const erro = aceitou ? null : (resposta.erro ?? `respondeu ${codigo}${redirecionou ? " (redirecionamento não é seguido: use o endereço final)" : ""}`);
 
   if (!erro) {
     await db.entregaWebhook.update({
@@ -104,28 +112,64 @@ export async function entregar(entrega: Entrega, agora = new Date(), unica = fal
   return false;
 }
 
-/** Chamado pelo relógio: entrega os avisos que estão na hora. */
-export async function processarWebhooks(agora = new Date()) {
+type OpcoesRodada = {
+  /** Só estas empresas (usado pelos testes, para não tocar nas outras). */
+  apenas?: string[];
+  consulta?: Consulta;
+};
+
+/**
+ * Chamado pelo relógio: entrega os avisos que estão na hora, em rodízio entre as
+ * empresas. São sempre poucas consultas, não importa quantas empresas existam.
+ */
+export async function processarWebhooks(agora = new Date(), { apenas, consulta }: OpcoesRodada = {}) {
+  const daEmpresa = apenas ? { organizacaoId: { in: apenas } } : {};
   // Ficou "enviando" (servidor caiu no meio)? Volta para a fila.
   await db.entregaWebhook.updateMany({
-    where: { status: "ENVIANDO", proximaEm: { lt: new Date(agora.getTime() - 5 * 60_000) } },
+    where: { status: "ENVIANDO", proximaEm: { lt: new Date(agora.getTime() - 5 * 60_000) }, webhook: daEmpresa },
     data: { status: "PENDENTE" },
   });
-  const prontas = await db.entregaWebhook.findMany({
+  const comAvisos = await db.webhook.findMany({
     // Empresa suspensa ou com o teste vencido: os avisos esperam na fila.
-    where: { status: "PENDENTE", proximaEm: { lte: agora }, webhook: { ativo: true, organizacao: ondeLiberada(agora) } },
-    orderBy: { proximaEm: "asc" },
-    take: POR_RODADA,
-    include: { webhook: true },
+    where: { ...daEmpresa, ativo: true, organizacao: ondeLiberada(agora), entregas: { some: { status: "PENDENTE", proximaEm: { lte: agora } } } },
+    select: { organizacaoId: true },
   });
+  const empresas = escolherEmpresas("webhooks", comAvisos.map((w) => w.organizacaoId), POR_RODADA);
+  if (empresas.length === 0) return { entregues: 0, vistas: 0 };
+  const cota = cotaPorEmpresa(POR_RODADA, empresas.length);
+
+  // As primeiras `cota` entregas de cada empresa, numa consulta só.
+  const escolhidas = await db.$queryRaw<{ id: string }[]>`
+    SELECT id FROM (
+      SELECT e.id, row_number() OVER (PARTITION BY w."organizacaoId" ORDER BY e."proximaEm", e.id) AS posicao
+      FROM "EntregaWebhook" e JOIN "Webhook" w ON w.id = e."webhookId"
+      WHERE e.status = 'PENDENTE' AND e."proximaEm" <= ${agora.toISOString()}::timestamp AND w.ativo AND w."organizacaoId" = ANY(${empresas})
+    ) fila WHERE posicao <= ${cota} LIMIT ${POR_RODADA}`;
+  const prontas = await db.entregaWebhook.findMany({ where: { id: { in: escolhidas.map((e) => e.id) } }, include: { webhook: true } });
+
   // Entrega em paralelo: um sistema fora do ar (10 s de espera) não segura os outros.
-  const resultados = await Promise.all(
-    prontas.map(async (e) => {
+  const resultados = await emParalelo(
+    prontas,
+    POR_RODADA,
+    async (e) => {
       const reservou = await db.entregaWebhook.updateMany({ where: { id: e.id, status: "PENDENTE" }, data: { status: "ENVIANDO", proximaEm: agora } });
-      return reservou.count ? entregar({ ...e, proximaEm: agora }, agora) : false;
-    }),
+      return reservou.count ? entregar({ ...e, proximaEm: agora }, agora, false, consulta) : false;
+    },
+    (erro, e) => console.error(`[webhooks] falha ao processar a entrega ${e.id}:`, erro),
   );
   return { entregues: resultados.filter(Boolean).length, vistas: prontas.length };
+}
+
+/** Apaga avisos concluídos (entregues ou desistidos) com mais de 30 dias. */
+export async function limparEntregasAntigas(agora = new Date(), apenas?: string[]) {
+  const r = await db.entregaWebhook.deleteMany({
+    where: {
+      status: { in: ["ENTREGUE", "FALHOU"] },
+      criadoEm: { lt: new Date(agora.getTime() - DIAS_GUARDADOS * 86_400_000) },
+      ...(apenas ? { webhook: { organizacaoId: { in: apenas } } } : {}),
+    },
+  });
+  return r.count;
 }
 
 // --- Dados enviados em cada evento ------------------------------------------

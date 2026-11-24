@@ -8,10 +8,13 @@ import "server-only";
 // - não bateu o limite do dia (todas as campanhas somadas);
 // - o WhatsApp está conectado (senão a campanha pausa sozinha).
 // As regras de ritmo estão em ./ritmo.ts.
+//
+// As campanhas de empresas diferentes rodam em paralelo, e um erro numa não para as outras.
 import type { Prisma } from "@/generated/prisma/client";
 import { preencherVariaveis } from "@/lib/atendimento";
 import { obterAutomacao } from "@/lib/automacao/config";
 import { estaAberto } from "@/lib/automacao/horario";
+import { emParalelo } from "@/lib/automacao/rodizio";
 import { db } from "@/lib/db";
 import { enviarAutomatico } from "@/lib/whatsapp/enviar";
 import { ErroWhatsapp, simulandoEnvio } from "@/lib/whatsapp/evolution";
@@ -45,38 +48,47 @@ async function pausar(campanhaId: string, motivo: string) {
   console.log(`[campanhas] campanha ${campanhaId} pausada: ${motivo}`);
 }
 
-export async function processarCampanhas(agora = new Date()) {
+const CAMPANHAS_JUNTAS = 5;
+
+/** `apenas`: só estas empresas (usado pelos testes, para não tocar nas outras). */
+export async function processarCampanhas(agora = new Date(), { apenas }: { apenas?: string[] } = {}) {
+  const daEmpresa = apenas ? { organizacaoId: { in: apenas } } : {};
   // Envio interrompido (servidor caiu no meio)? Não reenvia: marca erro.
   await db.destinatarioCampanha.updateMany({
-    where: { status: "ENVIANDO", campanha: { proximoEnvioEm: { lt: new Date(agora.getTime() - 10 * 60_000) } } },
+    where: { status: "ENVIANDO", campanha: { ...daEmpresa, proximoEnvioEm: { lt: new Date(agora.getTime() - 10 * 60_000) } } },
     data: { status: "ERRO", motivo: "envio interrompido (o servidor reiniciou?)" },
   });
 
   // Agendadas que chegaram na hora viram "enviando" (se não houver outra enviando na organização).
   const agendadas = await db.campanha.findMany({
-    where: { status: "AGENDADA", OR: [{ iniciarEm: null }, { iniciarEm: { lte: agora } }], organizacao: { ...ondeLiberada(agora), campanhasLiberadas: true } },
+    where: { ...daEmpresa, status: "AGENDADA", OR: [{ iniciarEm: null }, { iniciarEm: { lte: agora } }], organizacao: { ...ondeLiberada(agora), campanhasLiberadas: true } },
     orderBy: [{ iniciarEm: "asc" }, { criadoEm: "asc" }],
   });
   for (const c of agendadas) {
-    const ocupada = await db.campanha.count({ where: { organizacaoId: c.organizacaoId, status: "ENVIANDO" } });
-    if (ocupada) continue;
-    await db.campanha.update({
-      where: { id: c.id },
-      data: { status: "ENVIANDO", iniciadaEm: c.iniciadaEm ?? agora, proximoEnvioEm: agora, motivo: null },
-    });
+    try {
+      const ocupada = await db.campanha.count({ where: { organizacaoId: c.organizacaoId, status: "ENVIANDO" } });
+      if (ocupada) continue;
+      await db.campanha.update({
+        where: { id: c.id },
+        data: { status: "ENVIANDO", iniciadaEm: c.iniciadaEm ?? agora, proximoEnvioEm: agora, motivo: null },
+      });
+    } catch (e) {
+      console.error(`[campanhas] não consegui iniciar a campanha ${c.id}:`, e);
+    }
   }
 
   const ativas = await db.campanha.findMany({
     // Empresa suspensa ou com o teste vencido: a campanha fica parada onde está.
-    where: { status: "ENVIANDO", organizacao: { ...ondeLiberada(agora), campanhasLiberadas: true } },
+    where: { ...daEmpresa, status: "ENVIANDO", organizacao: { ...ondeLiberada(agora), campanhasLiberadas: true } },
     include: { organizacao: { select: { nome: true } } },
   });
-  let enviadas = 0;
-  for (const campanha of ativas) {
-    if (campanha.proximoEnvioEm && campanha.proximoEnvioEm > agora) continue;
-    if (await enviarUma(campanha, agora)) enviadas++;
-  }
-  return { enviadas, ativas: ativas.length };
+  const resultados = await emParalelo(
+    ativas.filter((c) => !c.proximoEnvioEm || c.proximoEnvioEm <= agora),
+    CAMPANHAS_JUNTAS,
+    (campanha) => enviarUma(campanha, agora),
+    (e, campanha) => console.error(`[campanhas] falha na campanha ${campanha.id}:`, e),
+  );
+  return { enviadas: resultados.filter(Boolean).length, ativas: ativas.length };
 }
 
 type CampanhaAtiva = Prisma.CampanhaGetPayload<{ include: { organizacao: { select: { nome: true } } } }>;

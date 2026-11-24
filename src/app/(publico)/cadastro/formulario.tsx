@@ -18,9 +18,9 @@ export function FormularioCadastro({ diasTeste }: { diasTeste: number }) {
       <div className="space-y-3 text-sm">
         <h1 className="text-lg font-semibold">Confira seu e-mail</h1>
         <p>
-          Enviamos um link para <strong>{estado.enviadoPara}</strong>. Clique nele para confirmar e entrar.
+          Enviamos um link para <strong>{estado.enviadoPara}</strong>. Abra o link para confirmar que o e-mail é seu e escolher a sua senha.
         </p>
-        <p className="text-slate-500">Não chegou em alguns minutos? Olhe a caixa de spam. Ao tentar entrar, enviamos o link de novo.</p>
+        <p className="text-slate-500">Não chegou em alguns minutos? Olhe a caixa de spam. Se precisar, faça o cadastro de novo daqui a 5 minutos.</p>
         <Link href="/login" className="botao-secundario w-full">Ir para a tela de entrada</Link>
       </div>
     );
@@ -59,17 +59,8 @@ export function FormularioCadastro({ diasTeste }: { diasTeste: number }) {
       </div>
       <div>
         <label className="rotulo" htmlFor="email">Seu e-mail (é o seu login)</label>
-        <input id="email" name="email" type="email" required maxLength={120} autoComplete="username" defaultValue={v.email} key={`e-${v.email}`} className="campo" />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="rotulo" htmlFor="senha">Senha (mínimo 8)</label>
-          <input id="senha" name="senha" type="password" required minLength={8} autoComplete="new-password" className="campo" />
-        </div>
-        <div>
-          <label className="rotulo" htmlFor="confirmacao">Repita a senha</label>
-          <input id="confirmacao" name="confirmacao" type="password" required minLength={8} autoComplete="new-password" className="campo" />
-        </div>
+        <input id="email" name="email" type="email" required maxLength={254} autoComplete="username" defaultValue={v.email} key={`e-${v.email}`} className="campo" />
+        <p className="mt-1 text-xs text-slate-500">Mandamos um link para ele. A senha você escolhe depois, ao abrir o link.</p>
       </div>
 
       {/* Armadilha para robôs: escondido de quem usa o site (e dos leitores de tela). */}

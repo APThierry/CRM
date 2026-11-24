@@ -6,8 +6,8 @@ import { exigirPapel, nomesPapel } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { dataHora } from "@/lib/formatar";
 import { temSenha } from "@/lib/senha";
-import { alterarPapel, alternarAtivo } from "./actions";
-import { FormNovoUsuario, FormRedefinirSenha } from "./formularios";
+import { alterarPapel, alternarAtivo, cancelarConvite } from "./actions";
+import { BotaoLinkDeSenha, BotaoReenviarConvite, FormNovoUsuario } from "./formularios";
 
 export const metadata: Metadata = { title: "Usuários" };
 
@@ -25,18 +25,51 @@ export default function PaginaUsuarios() {
 async function Lista() {
   await connection();
   const admin = await exigirPapel("ADMIN");
-  const usuarios = await db.usuario.findMany({
-    where: { organizacaoId: admin.organizacao.id },
-    orderBy: [{ ativo: "desc" }, { nome: "asc" }],
-    include: { _count: { select: { sessoes: true } } },
-  });
+  const [usuarios, convites] = await Promise.all([
+    db.usuario.findMany({
+      where: { organizacaoId: admin.organizacao.id },
+      orderBy: [{ ativo: "desc" }, { nome: "asc" }],
+      include: { _count: { select: { sessoes: true } } },
+    }),
+    db.convite.findMany({ where: { organizacaoId: admin.organizacao.id }, orderBy: { criadoEm: "desc" } }),
+  ]);
+  const agora = new Date();
 
   return (
     <div className="space-y-6">
       <section className="cartao p-4">
-        <h2 className="mb-3 text-sm font-semibold">Novo usuário</h2>
+        <h2 className="mb-1 text-sm font-semibold">Convidar usuário</h2>
+        <p className="mb-3 text-xs text-slate-500">A pessoa recebe um e-mail com um link, escolhe a própria senha e entra. Ela só aparece na lista abaixo depois de aceitar.</p>
         <FormNovoUsuario />
       </section>
+
+      {convites.length > 0 && (
+        <section className="cartao overflow-x-auto">
+          <h2 className="p-4 pb-2 text-sm font-semibold">Convites esperando</h2>
+          <table className="w-full text-sm">
+            <tbody className="divide-y divide-slate-100">
+              {convites.map((c) => (
+                <tr key={c.id}>
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{c.nome}</div>
+                    <div className="text-xs text-slate-500">{c.email}</div>
+                  </td>
+                  <td className="px-4 py-3 text-xs">{nomesPapel[c.papel]}</td>
+                  <td className="px-4 py-3 text-xs text-slate-500">{c.expiraEm > agora ? `vale até ${dataHora(c.expiraEm)}` : "vencido"}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-start gap-3">
+                      <BotaoReenviarConvite conviteId={c.id} />
+                      <form action={cancelarConvite.bind(null, c.id)}>
+                        <button className="py-1 text-xs text-slate-500 underline hover:text-slate-800">Cancelar</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       <section className="cartao overflow-x-auto">
         <table className="w-full text-sm">
@@ -84,7 +117,7 @@ async function Lista() {
                   </td>
                   <td className="px-4 py-3">
                     {!temSenha(u.senhaHash) && <div className="mb-1 text-xs font-medium text-amber-700">Sem senha (não consegue entrar)</div>}
-                    {!eu ? <FormRedefinirSenha usuarioId={u.id} /> : <span className="text-xs text-slate-400">troque em Meu perfil</span>}
+                    {!eu ? <BotaoLinkDeSenha usuarioId={u.id} /> : <span className="text-xs text-slate-400">troque em Meu perfil</span>}
                   </td>
                 </tr>
               );
@@ -98,10 +131,14 @@ async function Lista() {
         <ul className="list-disc space-y-1 pl-5">
           <li><strong>Administrador:</strong> tudo, inclusive cadastrar usuários.</li>
           <li><strong>Gestor:</strong> tudo, menos cadastrar usuários.</li>
-          <li><strong>Vendedor / Atendente:</strong> clientes, funil, WhatsApp, turmas e certificados.</li>
-          <li><strong>Instrutor:</strong> por enquanto, o mesmo acesso do vendedor. As restrições por papel entram junto com a Central de atendimento.</li>
+          <li><strong>Vendedor / Atendente:</strong> clientes, funil e atendimento no WhatsApp. Vê turmas e certificados, mas não altera.</li>
+          <li><strong>Instrutor:</strong> o mesmo do vendedor, e também cuida das turmas: inscrições, presença, resultado e certificados.</li>
+          <li>Conectar o número de WhatsApp é só com administrador e gestor.</li>
         </ul>
-        <p className="mt-2 text-xs text-slate-500">Desativar um usuário ou redefinir a senha desconecta a pessoa de todos os aparelhos na hora.</p>
+        <p className="mt-2 text-xs text-slate-500">
+          Ninguém define a senha de outra pessoa: o link de senha vai para o e-mail dela, e a senha atual vale até ela trocar. Desativar um usuário
+          desconecta a pessoa de todos os aparelhos na hora.
+        </p>
       </section>
     </div>
   );

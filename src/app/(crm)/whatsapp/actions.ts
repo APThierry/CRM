@@ -1,11 +1,12 @@
 "use server";
 // Ações do WhatsApp chamadas pelas telas.
+// Conectar, reconfigurar e desconectar o número: só administrador e gestor.
 import { refresh } from "next/cache";
 import { db } from "@/lib/db";
 import { normalizarWhatsapp } from "@/lib/formatar";
-import { getUsuarioAtual } from "@/lib/auth";
-import { getOrganizacaoAtual } from "@/lib/org";
+import { exigirPapel, getUsuarioAtual } from "@/lib/auth";
 import { buscarConversa } from "@/lib/atendimento";
+import { dentroDoLimite } from "@/lib/limite";
 import { enviarNaConversa } from "@/lib/whatsapp/enviar";
 import {
   desconectar,
@@ -16,6 +17,13 @@ import {
 } from "@/lib/whatsapp/evolution";
 import { instanciaDaEmpresa } from "@/lib/whatsapp/instancia";
 import { obterConversa } from "@/lib/whatsapp/mensagens";
+
+const gestor = () => exigirPapel("ADMIN", "GESTOR");
+
+/** A empresa tem alguém que já confirmou o e-mail e definiu a própria senha? */
+async function empresaConfirmada(organizacaoId: string) {
+  return (await db.usuario.count({ where: { organizacaoId, ativo: true, emailConfirmadoEm: { not: null }, senhaHash: { startsWith: "scrypt$" } } })) > 0;
+}
 
 /**
  * Marca o WhatsApp da organização como ligado ou desligado e devolve o nome da
@@ -29,15 +37,18 @@ async function registrarConfiguracao(organizacaoId: string, ativo: boolean) {
 
 /** Consultado a cada poucos segundos pela tela de conexão. */
 export async function statusWhatsapp() {
-  const org = await getOrganizacaoAtual();
+  const { organizacao: org } = await gestor();
   return estadoConexao(await instanciaDaEmpresa(org.id));
 }
 
 export async function iniciarConexao(): Promise<{ qr?: string | null; erro?: string }> {
-  const org = await getOrganizacaoAtual();
+  const { organizacao: org } = await gestor();
+  if (!(await empresaConfirmada(org.id))) return { erro: "Confirme o e-mail do administrador antes de conectar o WhatsApp." };
+  if (!dentroDoLimite(`whatsapp-conectar:${org.id}`, 20, 10 * 60_000)) return { erro: "Muitas tentativas. Espere alguns minutos." };
   try {
-    const instancia = await registrarConfiguracao(org.id, true);
-    return { qr: await gerarQrCode(instancia) };
+    const qr = await gerarQrCode(await instanciaDaEmpresa(org.id));
+    await registrarConfiguracao(org.id, true);
+    return { qr };
   } catch (e) {
     return { erro: e instanceof ErroWhatsapp ? e.message : "Erro ao gerar o QR Code." };
   }
@@ -45,9 +56,12 @@ export async function iniciarConexao(): Promise<{ qr?: string | null; erro?: str
 
 /** Reaplica o webhook (útil se o endereço do CRM mudar). */
 export async function reconfigurar(): Promise<{ erro?: string }> {
-  const org = await getOrganizacaoAtual();
+  const { organizacao: org } = await gestor();
+  if (!(await empresaConfirmada(org.id))) return { erro: "Confirme o e-mail do administrador antes de conectar o WhatsApp." };
+  if (!dentroDoLimite(`whatsapp-conectar:${org.id}`, 20, 10 * 60_000)) return { erro: "Muitas tentativas. Espere alguns minutos." };
   try {
-    await garantirInstancia(await registrarConfiguracao(org.id, true));
+    await garantirInstancia(await instanciaDaEmpresa(org.id));
+    await registrarConfiguracao(org.id, true);
     return {};
   } catch (e) {
     return { erro: e instanceof ErroWhatsapp ? e.message : "Erro ao configurar." };
@@ -55,7 +69,7 @@ export async function reconfigurar(): Promise<{ erro?: string }> {
 }
 
 export async function desconectarWhatsapp() {
-  const org = await getOrganizacaoAtual();
+  const { organizacao: org } = await gestor();
   const instancia = await registrarConfiguracao(org.id, false);
   await desconectar(instancia).catch(() => {});
   refresh();

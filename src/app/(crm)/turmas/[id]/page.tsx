@@ -5,10 +5,10 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { Cabecalho, Carregando, Etiqueta, Vazio } from "@/components/ui";
+import { getUsuarioAtual, podeCuidarDeTurmas } from "@/lib/auth";
 import { calcularValidade, situacaoCertificado } from "@/lib/certificados";
 import { db } from "@/lib/db";
 import { cpf, data } from "@/lib/formatar";
-import { getOrganizacaoAtual } from "@/lib/org";
 import type { StatusTurma } from "@/generated/prisma/client";
 import {
   alterarStatusTurma,
@@ -47,7 +47,8 @@ function BotaoAcao({ acao, children, ativo, cor = "slate" }: { acao: () => Promi
 async function Turma({ params }: { params: PageProps<"/turmas/[id]">["params"] }) {
   await connection();
   const { id } = await params;
-  const org = await getOrganizacaoAtual();
+  const { organizacao: org, papel } = await getUsuarioAtual();
+  const podeAlterar = podeCuidarDeTurmas(papel); // vendedor só vê
 
   const [turma, clientes] = await Promise.all([
     db.turma.findFirst({
@@ -78,7 +79,7 @@ async function Turma({ params }: { params: PageProps<"/turmas/[id]">["params"] }
         subtitulo={`${data(turma.dataInicio)}${turma.dataFim ? ` a ${data(turma.dataFim)}` : ""} · ${modalidade[turma.modalidade]}${turma.local ? ` · ${turma.local}` : ""}`}
         acoes={
           <>
-            <Link href={`/turmas/${turma.id}/editar`} className="botao-secundario">Editar</Link>
+            {podeAlterar && <Link href={`/turmas/${turma.id}/editar`} className="botao-secundario">Editar</Link>}
             <Link href="/turmas" className="botao-secundario">Voltar</Link>
           </>
         }
@@ -106,21 +107,23 @@ async function Turma({ params }: { params: PageProps<"/turmas/[id]">["params"] }
             {turma.observacoes && <p className="mt-3 rounded bg-slate-50 p-2 text-slate-600">{turma.observacoes}</p>}
           </section>
 
-          <section className="cartao p-4 text-sm">
-            <h2 className="mb-3 font-semibold">Mudar status</h2>
-            <div className="flex flex-wrap gap-2">
-              {(Object.keys(statusTurma) as StatusTurma[])
-                .filter((s) => s !== turma.status)
-                .map((s) => (
-                  <BotaoAcao key={s} acao={alterarStatusTurma.bind(null, turma.id, s)}>{statusTurma[s].rotulo}</BotaoAcao>
-                ))}
-            </div>
-          </section>
+          {podeAlterar && (
+            <section className="cartao p-4 text-sm">
+              <h2 className="mb-3 font-semibold">Mudar status</h2>
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(statusTurma) as StatusTurma[])
+                  .filter((s) => s !== turma.status)
+                  .map((s) => (
+                    <BotaoAcao key={s} acao={alterarStatusTurma.bind(null, turma.id, s)}>{statusTurma[s].rotulo}</BotaoAcao>
+                  ))}
+              </div>
+            </section>
+          )}
 
           <section className="cartao p-4 text-sm">
             <h2 className="mb-1 font-semibold">Resumo</h2>
             <p className="text-slate-600">{total} inscritos · {presentes} presentes · {aprovados} aprovados</p>
-            {pendentes > 0 && (
+            {podeAlterar && pendentes > 0 && (
               <form action={concluirTurma.bind(null, turma.id)} className="mt-3">
                 <button className="botao w-full">✔ Aprovar {pendentes} presente(s) e concluir turma</button>
                 <p className="mt-2 text-xs text-slate-500">Emite os certificados de quem está marcado como presente e ainda não tem resultado.</p>
@@ -130,23 +133,25 @@ async function Turma({ params }: { params: PageProps<"/turmas/[id]">["params"] }
         </div>
 
         <div className="space-y-6 lg:col-span-2">
-          <section className="cartao p-4 text-sm">
-            <h2 className="mb-3 font-semibold">Inscrever aluno</h2>
-            <form action={inscreverParticipante.bind(null, turma.id)} className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_150px_150px_auto]">
-              <input name="nome" required placeholder="Nome completo *" className="campo" aria-label="Nome completo" />
-              <input name="cpf" placeholder="CPF" className="campo" aria-label="CPF" />
-              <input name="telefone" placeholder="Telefone" className="campo" aria-label="Telefone" />
-              <button className="botao">Inscrever</button>
-              {!turma.clienteId && (
-                <select name="clienteId" className="campo sm:col-span-2 lg:col-span-4" aria-label="Empresa do aluno" defaultValue="">
-                  <option value="">Empresa do aluno (opcional)</option>
-                  {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                </select>
-              )}
-            </form>
-            {lotada && <p className="mt-2 text-xs font-medium text-amber-700">Atenção: a turma já atingiu o número de vagas.</p>}
-            <p className="mt-2 text-xs text-slate-500">Se o CPF já estiver cadastrado, o CRM reaproveita o aluno e mantém o histórico dele.</p>
-          </section>
+          {podeAlterar && (
+            <section className="cartao p-4 text-sm">
+              <h2 className="mb-3 font-semibold">Inscrever aluno</h2>
+              <form action={inscreverParticipante.bind(null, turma.id)} className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_150px_150px_auto]">
+                <input name="nome" required maxLength={200} placeholder="Nome completo *" className="campo" aria-label="Nome completo" />
+                <input name="cpf" maxLength={30} placeholder="CPF" className="campo" aria-label="CPF" />
+                <input name="telefone" maxLength={30} placeholder="Telefone" className="campo" aria-label="Telefone" />
+                <button className="botao">Inscrever</button>
+                {!turma.clienteId && (
+                  <select name="clienteId" className="campo sm:col-span-2 lg:col-span-4" aria-label="Empresa do aluno" defaultValue="">
+                    <option value="">Empresa do aluno (opcional)</option>
+                    {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                  </select>
+                )}
+              </form>
+              {lotada && <p className="mt-2 text-xs font-medium text-amber-700">Atenção: a turma já atingiu o número de vagas.</p>}
+              <p className="mt-2 text-xs text-slate-500">Se o CPF já estiver cadastrado, o CRM reaproveita o aluno e mantém o histórico dele.</p>
+            </section>
+          )}
 
           <section className="cartao text-sm">
             <h2 className="p-4 pb-0 font-semibold">Alunos ({total})</h2>
@@ -177,16 +182,24 @@ async function Turma({ params }: { params: PageProps<"/turmas/[id]">["params"] }
                             </div>
                           </td>
                           <td className="px-4 py-2">
-                            <div className="flex gap-1">
-                              <BotaoAcao cor="green" ativo={m.presente === true} acao={marcarPresenca.bind(null, m.id, m.presente === true ? null : true)}>Presente</BotaoAcao>
-                              <BotaoAcao cor="red" ativo={m.presente === false} acao={marcarPresenca.bind(null, m.id, m.presente === false ? null : false)}>Faltou</BotaoAcao>
-                            </div>
+                            {podeAlterar ? (
+                              <div className="flex gap-1">
+                                <BotaoAcao cor="green" ativo={m.presente === true} acao={marcarPresenca.bind(null, m.id, m.presente === true ? null : true)}>Presente</BotaoAcao>
+                                <BotaoAcao cor="red" ativo={m.presente === false} acao={marcarPresenca.bind(null, m.id, m.presente === false ? null : false)}>Faltou</BotaoAcao>
+                              </div>
+                            ) : (
+                              <span className="text-xs">{m.presente === null ? "—" : m.presente ? "Presente" : "Faltou"}</span>
+                            )}
                           </td>
                           <td className="px-4 py-2">
-                            <div className="flex gap-1">
-                              <BotaoAcao cor="green" ativo={m.aprovado === true} acao={definirResultado.bind(null, m.id, m.aprovado === true ? null : true)}>Aprovado</BotaoAcao>
-                              <BotaoAcao cor="red" ativo={m.aprovado === false} acao={definirResultado.bind(null, m.id, m.aprovado === false ? null : false)}>Reprovado</BotaoAcao>
-                            </div>
+                            {podeAlterar ? (
+                              <div className="flex gap-1">
+                                <BotaoAcao cor="green" ativo={m.aprovado === true} acao={definirResultado.bind(null, m.id, m.aprovado === true ? null : true)}>Aprovado</BotaoAcao>
+                                <BotaoAcao cor="red" ativo={m.aprovado === false} acao={definirResultado.bind(null, m.id, m.aprovado === false ? null : false)}>Reprovado</BotaoAcao>
+                              </div>
+                            ) : (
+                              <span className="text-xs">{m.aprovado === null ? "—" : m.aprovado ? "Aprovado" : "Reprovado"}</span>
+                            )}
                           </td>
                           <td className="px-4 py-2">
                             {m.aprovado && m.certificadoNumero ? (
@@ -204,7 +217,7 @@ async function Turma({ params }: { params: PageProps<"/turmas/[id]">["params"] }
                             )}
                           </td>
                           <td className="px-4 py-2 text-right">
-                            {!m.certificadoNumero && (
+                            {podeAlterar && !m.certificadoNumero && (
                               <BotaoAcao acao={removerInscricao.bind(null, m.id)}>Remover</BotaoAcao>
                             )}
                           </td>

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useActionState } from "react";
-import { definirNovaSenha, pedirNovaSenha } from "./actions";
+import { pedirNovaSenha, type EstadoSenha } from "./actions";
 
 export function FormularioEsqueci() {
   const [estado, acao, enviando] = useActionState(pedirNovaSenha, null);
@@ -18,7 +18,7 @@ export function FormularioEsqueci() {
     <form action={acao} className="space-y-4">
       <div>
         <label className="rotulo" htmlFor="email">Seu e-mail</label>
-        <input id="email" name="email" type="email" required autoFocus autoComplete="username" defaultValue={estado?.email} className="campo" />
+        <input id="email" name="email" type="email" required maxLength={254} autoFocus autoComplete="username" defaultValue={estado?.email} className="campo" />
       </div>
       {estado?.erro && <p className="rounded bg-red-50 p-2 text-sm text-red-700">{estado.erro}</p>}
       <button className="botao w-full" disabled={enviando}>{enviando ? "Enviando…" : "Enviar link"}</button>
@@ -29,8 +29,9 @@ export function FormularioEsqueci() {
   );
 }
 
-export function FormularioNovaSenha({ codigo }: { codigo: string }) {
-  const [estado, acao, enviando] = useActionState(definirNovaSenha.bind(null, codigo), null);
+/** Escolher a própria senha por um link do e-mail: cadastro, convite e senha nova. */
+export function FormularioDeSenha({ acao: aoEnviar, botao }: { acao: (estado: EstadoSenha, f: FormData) => Promise<EstadoSenha>; botao: string }) {
+  const [estado, acao, enviando] = useActionState(aoEnviar, null);
   if (estado?.ok) {
     return (
       <div className="space-y-3 text-sm">
@@ -43,14 +44,14 @@ export function FormularioNovaSenha({ codigo }: { codigo: string }) {
     <form action={acao} className="space-y-4">
       <div>
         <label className="rotulo" htmlFor="senha">Senha nova (mínimo 8 caracteres)</label>
-        <input id="senha" name="senha" type="password" required minLength={8} autoFocus autoComplete="new-password" className="campo" />
+        <input id="senha" name="senha" type="password" required minLength={8} maxLength={200} autoFocus autoComplete="new-password" className="campo" />
       </div>
       <div>
         <label className="rotulo" htmlFor="confirmacao">Repita a senha nova</label>
-        <input id="confirmacao" name="confirmacao" type="password" required minLength={8} autoComplete="new-password" className="campo" />
+        <input id="confirmacao" name="confirmacao" type="password" required minLength={8} maxLength={200} autoComplete="new-password" className="campo" />
       </div>
       {estado?.erro && <p className="rounded bg-red-50 p-2 text-sm text-red-700">{estado.erro}</p>}
-      <button className="botao w-full" disabled={enviando}>{enviando ? "Salvando…" : "Salvar senha e entrar"}</button>
+      <button className="botao w-full" disabled={enviando}>{enviando ? "Salvando…" : botao}</button>
     </form>
   );
 }

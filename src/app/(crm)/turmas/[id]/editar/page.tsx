@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { Cabecalho, Carregando } from "@/components/ui";
+import { exigirCuidadoDeTurmas } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getOrganizacaoAtual } from "@/lib/org";
 import { FormularioTurma } from "../../formulario-turma";
 
 export const metadata: Metadata = { title: "Editar turma" };
@@ -23,7 +23,7 @@ export default function PaginaEditarTurma({ params }: PageProps<"/turmas/[id]/ed
 async function Conteudo({ params }: { params: PageProps<"/turmas/[id]/editar">["params"] }) {
   await connection();
   const { id } = await params;
-  const org = await getOrganizacaoAtual();
+  const { organizacao: org } = await exigirCuidadoDeTurmas();
   const turma = await db.turma.findFirst({ where: { id, organizacaoId: org.id } });
   if (!turma) notFound();
   return <FormularioTurma turma={turma} />;

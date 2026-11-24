@@ -49,9 +49,15 @@ npm run dev           # abre em http://localhost:3000
 
 ## Primeiro acesso
 
-Na primeira vez, abra http://localhost:3000. Numa instalação nova (uma empresa só, a do seed, e ninguém com senha), o CRM mostra **Primeiro acesso**: crie o administrador (nome, e-mail e senha). Depois, em **Usuários**, cadastre a equipe.
+Na primeira vez, abra http://localhost:3000. Numa instalação nova (uma empresa só, a do seed, e ninguém com senha), o CRM mostra **Primeiro acesso**: crie o administrador (nome, e-mail e senha). Depois, em **Usuários**, convide a equipe: cada pessoa recebe um link e escolhe a própria senha.
 
-Outras empresas se cadastram sozinhas em `/cadastro` (link **Criar conta grátis** na tela de entrada), com 14 dias de teste e confirmação por e-mail. Você também pode criar uma pelo terminal (veja [docs/MULTIEMPRESA.md](docs/MULTIEMPRESA.md)):
+Em produção o primeiro acesso só aparece com o `SETUP_TOKEN` do `.env` (veja [docs/DEPLOY-VPS.md](docs/DEPLOY-VPS.md)). Outro caminho, que funciona sempre, é gerar um link pelo terminal do servidor:
+
+```bash
+npx tsx --conditions=react-server scripts/definir-acesso.mts email@empresa.com
+```
+
+Outras empresas se cadastram sozinhas em `/cadastro` (link **Criar conta grátis** na tela de entrada), com 14 dias de teste e confirmação por e-mail. Você também pode criar uma pelo terminal; ele mostra um link para o administrador escolher a senha (veja [docs/MULTIEMPRESA.md](docs/MULTIEMPRESA.md)):
 
 ```bash
 npx tsx --conditions=react-server scripts/criar-empresa.mts "Nome da empresa" "Nome do admin" email@empresa.com 14
@@ -67,9 +73,9 @@ npx tsx --conditions=react-server scripts/criar-empresa.mts "Nome da empresa" "N
 | Automação | `/automacao` | Horário de atendimento com aviso automático, chatbot de boas-vindas (menu), sequências de follow-up e a fila de mensagens agendadas |
 | Clientes | `/clientes` | Lista com busca, cadastro e ficha (contatos, negócios, certificados, histórico e tarefas, botão do WhatsApp) |
 | Funil de vendas | `/funil` | Kanban de arrastar e soltar (no celular, seletor "Mover para…"), criação de negócios |
-| Turmas | `/turmas` | Agenda, cadastro e edição; na turma: inscrição de alunos, presença, aprovação e emissão de certificados |
+| Turmas | `/turmas` | Agenda, cadastro e edição; na turma: inscrição de alunos, presença, aprovação e emissão de certificados. Vendedor só vê |
 | Certificados | `/certificados` | Todos os certificados, filtro válido/vencendo/vencido, busca e impressão (PDF) |
-| WhatsApp | `/whatsapp` | Conexão do número por QR Code e resumo das conversas |
-| Usuários | `/usuarios` | Cadastro da equipe, papéis, desativar e redefinir senha (só administrador) |
+| WhatsApp | `/whatsapp` | Conexão do número por QR Code e resumo das conversas (administrador e gestor) |
+| Usuários | `/usuarios` | Convites, papéis, desativar e mandar link de senha (só administrador) |
 | Meu perfil | `/perfil` | Nome, senha e assinatura no WhatsApp |
 | Cursos | `/cursos` | Os 9 cursos da Brigada MG (somente leitura por enquanto) |

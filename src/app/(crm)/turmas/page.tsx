@@ -3,6 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { Cabecalho, Carregando, Etiqueta, Vazio } from "@/components/ui";
+import { getUsuarioAtual, podeCuidarDeTurmas } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { data } from "@/lib/formatar";
 import { getOrganizacaoAtual } from "@/lib/org";
@@ -16,13 +17,24 @@ export default function PaginaTurmas() {
       <Cabecalho
         titulo="Turmas"
         subtitulo="Agenda de treinamentos"
-        acoes={<Link href="/turmas/nova" className="botao">+ Nova turma</Link>}
+        acoes={
+          <Suspense fallback={null}>
+            <BotaoNovaTurma />
+          </Suspense>
+        }
       />
       <Suspense fallback={<Carregando />}>
         <ListaTurmas />
       </Suspense>
     </>
   );
+}
+
+/** Vendedor vê as turmas, mas não cria nem altera. */
+async function BotaoNovaTurma() {
+  await connection();
+  const { papel } = await getUsuarioAtual();
+  return podeCuidarDeTurmas(papel) ? <Link href="/turmas/nova" className="botao">+ Nova turma</Link> : null;
 }
 
 async function ListaTurmas() {

@@ -5,7 +5,9 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { Cabecalho, Carregando } from "@/components/ui";
 import { getUsuarioAtual } from "@/lib/auth";
+import { LIMITES } from "@/lib/ambiente";
 import { db } from "@/lib/db";
+import { enviosDeHoje } from "@/lib/whatsapp/cota";
 
 export const metadata = { title: "Primeiros passos" };
 
@@ -24,13 +26,14 @@ async function Conteudo() {
   await connection();
   const eu = await getUsuarioAtual();
   const organizacaoId = eu.organizacao.id;
-  const [zap, automacao, usuarios, clientes, conversas, liberacao] = await Promise.all([
+  const [zap, automacao, usuarios, clientes, conversas, liberacao, enviados] = await Promise.all([
     db.configuracaoWhatsapp.findUnique({ where: { organizacaoId }, select: { ativo: true } }),
     db.configuracaoAutomacao.findUnique({ where: { organizacaoId }, select: { horarioAtivo: true, botAtivo: true } }),
     db.usuario.count({ where: { organizacaoId, ativo: true } }),
     db.cliente.count({ where: { organizacaoId } }),
     db.conversa.count({ where: { organizacaoId } }),
     db.organizacao.findUniqueOrThrow({ where: { id: organizacaoId }, select: { campanhasLiberadas: true } }),
+    enviosDeHoje(organizacaoId),
   ]);
 
   const passos = [
@@ -50,10 +53,10 @@ async function Conteudo() {
     },
     {
       feito: usuarios > 1,
-      titulo: "Cadastrar a equipe",
+      titulo: "Convidar a equipe",
       texto: "Cada atendente com o próprio login. Gestores veem todas as conversas e relatórios; vendedores, as deles.",
       href: "/usuarios",
-      botao: "Cadastrar",
+      botao: "Convidar",
     },
     {
       feito: clientes > 0,
@@ -99,9 +102,15 @@ async function Conteudo() {
         ))}
       </ol>
       {!liberacao.campanhasLiberadas && (
-        <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-          <strong>Campanhas (envio em massa):</strong> ficam disponíveis depois que o suporte aprovar a conta. Até lá, dá para montar e revisar.
-        </p>
+        <div className="space-y-1 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+          <p>
+            <strong>Campanhas (envio em massa):</strong> ficam disponíveis depois que o suporte aprovar a conta. Até lá, dá para montar e revisar.
+          </p>
+          <p>
+            <strong>Mensagens novas:</strong> até a aprovação, a empresa pode começar {LIMITES.enviosPorDia()} por dia ({enviados} hoje). Responder quem escreveu nas
+            últimas 24 horas não conta.
+          </p>
+        </div>
       )}
     </div>
   );

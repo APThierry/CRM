@@ -37,6 +37,8 @@ model Organizacao {
   campanhasLiberadas  Boolean   @default(true) // quem se cadastra sozinho só dispara campanhas depois que o dono aprova
   termosAceitosEm     DateTime?
   termosVersao        String?
+  // Espaço ocupado pelos arquivos do WhatsApp (em KB). Vazio = ainda não medido (src/lib/arquivos.ts).
+  arquivosKb          Int?
 
   usuarios      Usuario[]
   clientes      Cliente[]
@@ -59,6 +61,8 @@ model Organizacao {
   campanhas     Campanha[]
   descadastros  Descadastro[]
   webhooks      Webhook[]
+  convites      Convite[]
+  envios        EnvioDiario[]
 }
 
 enum SituacaoEmpresa {
@@ -86,7 +90,7 @@ model Usuario {
   assinaturaWhatsapp Boolean   @default(true)
   // Link da agenda (.ics) para assinar no Google Agenda. Guardamos só o hash do código.
   agendaTokenHash    String?   @unique
-  // Fase F2: quem se cadastra sozinho só entra depois de clicar no link do e-mail.
+  // Só entra quem provou que o e-mail é seu: definiu a própria senha pelo link recebido.
   emailConfirmadoEm  DateTime?
   ultimoAcesso       DateTime?
   criadoEm           DateTime  @default(now())
@@ -108,14 +112,12 @@ model Usuario {
   @@index([organizacaoId])
 }
 
-// Sessão de login. O navegador guarda só um código aleatório (cookie);
-// aqui fica o "hash" desse código, então quem vê o banco não consegue entrar.
 enum TipoCodigoEmail {
-  CONFIRMAR_EMAIL
+  CONFIRMAR_EMAIL // não é mais usado (o cadastro virou CadastroPendente)
   NOVA_SENHA
 }
 
-/** Links enviados por e-mail (confirmar cadastro, criar nova senha). Guardamos só o hash. */
+/// Links de "criar nova senha" enviados por e-mail. Guardamos só o hash.
 model CodigoEmail {
   id        String          @id @default(cuid())
   usuarioId String
@@ -130,6 +132,44 @@ model CodigoEmail {
   @@index([usuarioId, tipo])
 }
 
+/// Convite para entrar na empresa. O usuário só nasce quando a pessoa abre o link
+/// e define a própria senha. Assim ninguém "segura" o e-mail de outra pessoa.
+model Convite {
+  id            String   @id @default(cuid())
+  organizacaoId String
+  nome          String
+  email         String
+  papel         Papel    @default(VENDEDOR)
+  tokenHash     String   @unique
+  expiraEm      DateTime
+  criadoEm      DateTime @default(now())
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+
+  @@unique([organizacaoId, email])
+  @@index([expiraEm])
+}
+
+/// Pedido de cadastro da página "Criar conta". A empresa e o administrador só são
+/// criados quando a pessoa abre o link do e-mail e define a própria senha.
+model CadastroPendente {
+  id           String   @id @default(cuid())
+  email        String
+  nome         String
+  empresa      String
+  ramo         String?
+  telefone     String?
+  termosVersao String
+  tokenHash    String   @unique
+  expiraEm     DateTime
+  criadoEm     DateTime @default(now())
+
+  @@index([email])
+  @@index([expiraEm])
+}
+
+// Sessão de login. O navegador guarda só um código aleatório (cookie);
+// aqui fica o "hash" desse código, então quem vê o banco não consegue entrar.
 model Sessao {
   id        String   @id @default(cuid())
   usuarioId String
@@ -641,6 +681,19 @@ model MensagemAgendada {
 
   @@index([status, enviarEm])
   @@index([conversaId, status])
+  @@index([organizacaoId, status, enviarEm])
+}
+
+/// Mensagens que a empresa começou no dia (para quem não escreveu nas últimas 24 h).
+/// Só conta empresas ainda não aprovadas (src/lib/whatsapp/cota.ts).
+model EnvioDiario {
+  organizacaoId String
+  dia           String // "2026-11-24", no horário de Brasília
+  total         Int    @default(0)
+
+  organizacao Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+
+  @@id([organizacaoId, dia])
 }
 
 // ---------------------------------------------------------------------------
@@ -789,4 +842,5 @@ model EntregaWebhook {
 
   @@index([status, proximaEm])
   @@index([webhookId, criadoEm])
+  @@index([webhookId, status, proximaEm])
 }

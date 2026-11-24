@@ -3,11 +3,15 @@ import "server-only";
 // Usado pela Central de atendimento e pela ficha do cliente.
 import type { Conversa } from "@/generated/prisma/client";
 import type { UsuarioAtual } from "@/lib/auth";
-import { salvarArquivo, TAMANHO_MAXIMO } from "@/lib/arquivos";
+import { devolverEspaco, ERRO_ESPACO, gravarArquivo, reservarEspaco, TAMANHO_MAXIMO } from "@/lib/arquivos";
 import { db } from "@/lib/db";
+import { umaLinha } from "@/lib/validar";
+import { comPasse } from "@/lib/whatsapp/cota";
 import { enviarAudio, enviarMidia, enviarTexto, ErroWhatsapp } from "@/lib/whatsapp/evolution";
-import { instanciaDaEmpresa } from "@/lib/whatsapp/instancia";
 import { registrarMensagem } from "@/lib/whatsapp/mensagens";
+
+/** Maior texto de uma mensagem. */
+export const TEXTO_MAXIMO = 4096;
 
 /** "*Ana:*\nBom dia!" quando a pessoa usa assinatura (negrito no WhatsApp). */
 export function assinar(eu: Pick<UsuarioAtual, "nome" | "assinaturaWhatsapp">, texto: string) {
@@ -36,35 +40,41 @@ export async function enviarNaConversa(
   const limpo = (texto ?? "").trim();
   const temArquivo = arquivo && arquivo.size > 0;
   if (!limpo && !temArquivo) return { erro: "Escreva a mensagem ou escolha um arquivo." };
+  if (limpo.length > TEXTO_MAXIMO) return { erro: `Mensagem grande demais (máximo ${TEXTO_MAXIMO} caracteres).` };
   if (temArquivo && arquivo.size > TAMANHO_MAXIMO) return { erro: "Arquivo grande demais (máximo 16 MB)." };
 
   const numero = conversa.telefone;
+  const org = conversa.organizacaoId;
   try {
-    const instancia = await instanciaDaEmpresa(conversa.organizacaoId);
     if (temArquivo) {
-      const mimetype = arquivo.type || "application/octet-stream";
+      const mimetype = umaLinha(arquivo.type, 100) || "application/octet-stream";
+      const nomeArquivo = umaLinha(arquivo.name, 200) || "arquivo";
       const { evolution, tipo } = tipoDoArquivo(mimetype);
+      // Reserva o espaço antes de enviar: não sai mensagem que não daria para guardar.
+      if (!(await reservarEspaco(org, arquivo.size))) return { erro: ERRO_ESPACO };
       const conteudoArquivo = Buffer.from(await arquivo.arrayBuffer());
       const base64 = conteudoArquivo.toString("base64");
 
       // Áudio não tem legenda no WhatsApp: se houver texto, ele vai numa mensagem separada.
       const legenda = evolution === "audio" ? "" : assinar(eu, limpo);
-      const { idExterno } =
-        evolution === "audio"
-          ? await enviarAudio(instancia, numero, base64)
-          : await enviarMidia(instancia, numero, { tipo: evolution, base64, mimetype, nomeArquivo: arquivo.name, legenda });
+      const { idExterno } = await comPasse(org, numero, (passe) =>
+        evolution === "audio" ? enviarAudio(passe, numero, base64) : enviarMidia(passe, numero, { tipo: evolution, base64, mimetype, nomeArquivo, legenda }),
+      ).catch(async (e) => {
+        await devolverEspaco(org, arquivo.size);
+        throw e;
+      });
 
-      const caminho = await salvarArquivo(conversa.organizacaoId, conteudoArquivo, mimetype, arquivo.name);
-      const padrao = { IMAGEM: "📷 Imagem", VIDEO: "🎥 Vídeo", AUDIO: "🎤 Áudio", DOCUMENTO: `📎 ${arquivo.name}` }[tipo];
+      const caminho = await gravarArquivo(org, conteudoArquivo, mimetype, nomeArquivo);
+      const padrao = { IMAGEM: "📷 Imagem", VIDEO: "🎥 Vídeo", AUDIO: "🎤 Áudio", DOCUMENTO: `📎 ${nomeArquivo}` }[tipo];
       await registrarMensagem({
-        organizacaoId: conversa.organizacaoId,
+        organizacaoId: org,
         telefone: numero,
         direcao: "SAIDA",
         tipo,
         conteudo: (evolution !== "audio" && limpo) || padrao,
         arquivo: caminho,
         mimetype,
-        nomeArquivo: arquivo.name,
+        nomeArquivo,
         status: "enviada",
         idExterno,
         usuarioId: eu.id,
@@ -74,6 +84,7 @@ export async function enviarNaConversa(
       await enviarSoTexto(eu, conversa, limpo);
     }
   } catch (e) {
+    if (!(e instanceof ErroWhatsapp)) console.error("[whatsapp] não consegui enviar a mensagem:", e);
     return { erro: e instanceof ErroWhatsapp ? e.message : "Não foi possível enviar a mensagem." };
   }
 
@@ -90,7 +101,7 @@ export async function enviarNaConversa(
  * Envio feito pelo próprio CRM (chatbot, horário de atendimento, agendamentos).
  * Com `autor`, a mensagem sai assinada por ele (agendada por uma pessoa); sem
  * autor, sai como "automática". Não mexe no atendente nem nas não lidas.
- * Lança ErroWhatsapp se a Evolution API recusar.
+ * Lança ErroWhatsapp se a Evolution API recusar (ErroLimiteEnvio se bateu o teto do dia).
  */
 export async function enviarAutomatico(
   conversa: Pick<Conversa, "organizacaoId" | "telefone">,
@@ -99,8 +110,9 @@ export async function enviarAutomatico(
   /** Como aparece na conversa (padrão: "agendada" ou "automática"). Campanhas usam "campanha". */
   rotulo?: string,
 ) {
-  const instancia = await instanciaDaEmpresa(conversa.organizacaoId);
-  const { idExterno } = await enviarTexto(instancia, conversa.telefone, autor ? assinar(autor, texto) : texto);
+  const { idExterno } = await comPasse(conversa.organizacaoId, conversa.telefone, (passe) =>
+    enviarTexto(passe, conversa.telefone, autor ? assinar(autor, texto) : texto),
+  );
   await registrarMensagem({
     organizacaoId: conversa.organizacaoId,
     telefone: conversa.telefone,
@@ -113,8 +125,13 @@ export async function enviarAutomatico(
   return { idExterno };
 }
 
+/** Teste de campanha: vai direto para o número, sem entrar na Central de atendimento. */
+export async function enviarAvulso(organizacaoId: string, numero: string, texto: string) {
+  return comPasse(organizacaoId, numero, (passe) => enviarTexto(passe, numero, texto));
+}
+
 async function enviarSoTexto(eu: UsuarioAtual, conversa: Pick<Conversa, "organizacaoId" | "telefone">, texto: string) {
-  const { idExterno } = await enviarTexto(await instanciaDaEmpresa(conversa.organizacaoId), conversa.telefone, assinar(eu, texto));
+  const { idExterno } = await comPasse(conversa.organizacaoId, conversa.telefone, (passe) => enviarTexto(passe, conversa.telefone, assinar(eu, texto)));
   await registrarMensagem({
     organizacaoId: conversa.organizacaoId,
     telefone: conversa.telefone,

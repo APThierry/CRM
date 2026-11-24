@@ -26,12 +26,15 @@ export function ConversaWhatsapp({
   mensagens,
   numeros,
   conectado,
+  podeConectar,
 }: {
   empresa: string;
   clienteId: string;
   mensagens: MensagemTela[];
   numeros: { valor: string; rotulo: string }[];
   conectado: boolean;
+  /** Só administrador e gestor conectam o número. */
+  podeConectar: boolean;
 }) {
   const router = useRouter();
   const [estado, enviar, enviando] = useActionState(enviarParaCliente.bind(null, clienteId), null);
@@ -75,7 +78,7 @@ export function ConversaWhatsapp({
 
       {!conectado ? (
         <p className="mt-3 rounded bg-amber-50 p-3 text-xs text-amber-800">
-          O WhatsApp não está conectado. <a href="/whatsapp" className="underline">Conectar agora</a>
+          O WhatsApp não está conectado. {podeConectar ? <a href="/whatsapp" className="underline">Conectar agora</a> : "Peça ao administrador ou gestor."}
         </p>
       ) : numeros.length === 0 ? (
         <p className="mt-3 rounded bg-amber-50 p-3 text-xs text-amber-800">Cadastre um número de WhatsApp para este cliente.</p>
@@ -103,7 +106,7 @@ export function ConversaWhatsapp({
             </select>
           </div>
           <div className="flex gap-2">
-            <textarea name="texto" required rows={2} placeholder="Escreva a mensagem…" className="campo" />
+            <textarea name="texto" required maxLength={4096} rows={2} placeholder="Escreva a mensagem…" className="campo" />
             <button className="botao bg-green-600 hover:bg-green-700" disabled={enviando}>
               {enviando ? "Enviando…" : "Enviar"}
             </button>

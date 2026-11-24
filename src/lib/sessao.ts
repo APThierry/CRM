@@ -8,6 +8,8 @@ import { cookies, headers } from "next/headers";
 import { cache } from "react";
 import { db } from "@/lib/db";
 import { empresaLiberada } from "@/lib/empresas/situacao";
+import { COOKIE_APARELHO, DIAS_APARELHO, novoAparelho } from "@/lib/login-protecao";
+import { temSenha } from "@/lib/senha";
 
 export const COOKIE_SESSAO = "crm_sessao";
 const DURACAO_DIAS = 30;
@@ -20,7 +22,7 @@ export async function criarSessao(usuarioId: string) {
   const navegador = (await headers()).get("user-agent")?.slice(0, 200) ?? null;
 
   await db.sessao.create({ data: { usuarioId, tokenHash: hashToken(token), expiraEm, navegador } });
-  await db.usuario.update({ where: { id: usuarioId }, data: { ultimoAcesso: new Date() } });
+  const usuario = await db.usuario.update({ where: { id: usuarioId }, data: { ultimoAcesso: new Date() } });
 
   (await cookies()).set(COOKIE_SESSAO, token, {
     httpOnly: true,
@@ -28,6 +30,22 @@ export async function criarSessao(usuarioId: string) {
     sameSite: "lax",
     path: "/",
     expires: expiraEm,
+  });
+  await marcarAparelho(usuario);
+}
+
+/**
+ * Lembra que a conta já entrou neste aparelho: se alguém tentar adivinhar a senha de
+ * longe, o bloqueio do login não atinge o dono (src/lib/login-protecao.ts). Não dá acesso.
+ */
+export async function marcarAparelho(usuario: { id: string; senhaHash: string }) {
+  if (!temSenha(usuario.senhaHash)) return;
+  (await cookies()).set(COOKIE_APARELHO, novoAparelho(usuario), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/login",
+    maxAge: DIAS_APARELHO * 86_400,
   });
 }
 
@@ -58,7 +76,7 @@ export const lerSessao = cache(async () => {
     where: { tokenHash: hashToken(token) },
     include: { usuario: { include: { organizacao: true } } },
   });
-  if (!sessao || sessao.expiraEm < new Date() || !sessao.usuario.ativo) return null;
+  if (!sessao || sessao.expiraEm < new Date() || !sessao.usuario.ativo || !sessao.usuario.emailConfirmadoEm) return null;
   // Empresa suspensa ou com o teste vencido: a sessão deixa de valer na hora.
   if (!empresaLiberada(sessao.usuario.organizacao)) return null;
   return sessao;

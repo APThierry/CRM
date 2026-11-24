@@ -9,6 +9,24 @@ import { prepararEmpresa } from "../src/lib/empresas/preparar";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, type Cliente, type Contato, type EtapaFunil, type Servico } from "../src/generated/prisma/client";
 
+// O seed APAGA e recria a empresa de exemplo: nunca em produção. Na VPS, crie a empresa
+// com scripts/criar-empresa.mts.
+if (process.env.NODE_ENV === "production") {
+  console.error("O seed não roda em produção (ele apaga a empresa de exemplo). Use scripts/criar-empresa.mts.");
+  process.exit(1);
+}
+const servidorDoBanco = (() => {
+  try {
+    return new URL(process.env.DATABASE_URL ?? "").hostname;
+  } catch {
+    return "";
+  }
+})();
+if (!["localhost", "127.0.0.1", "[::1]"].includes(servidorDoBanco)) {
+  console.error("O seed só roda no banco do seu computador (DATABASE_URL em localhost). Em outro servidor, use scripts/criar-empresa.mts.");
+  process.exit(1);
+}
+
 const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
@@ -40,7 +58,7 @@ async function main() {
   });
   const organizacaoId = org.id;
 
-  // Usuários de exemplo. O login entra na Fase 2, por isso a senha ainda não existe.
+  // Usuários de exemplo, sem senha (não entram). O "primeiro acesso" cria o administrador.
   const [admin, vendedora, instrutor] = await Promise.all(
     [
       { nome: "Administrador", email: "admin@brigadamg.local", papel: "ADMIN" as const },

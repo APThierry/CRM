@@ -17,6 +17,7 @@ export async function criarResposta(_estado: Resultado, formData: FormData): Pro
   const daEquipe = formData.get("daEquipe") === "on";
   if (!/^[a-z0-9à-ú_-]{1,30}$/.test(atalho)) return { erro: "Atalho: use só letras, números e hífen (até 30)." };
   if (!texto) return { erro: "Escreva o texto da resposta." };
+  if (texto.length > 4000) return { erro: "Texto grande demais (máximo 4000 caracteres)." };
   if (daEquipe && !veTodasConversas(eu.papel)) return { erro: "Só administrador ou gestor cria respostas da equipe." };
 
   const usuarioId = daEquipe ? null : eu.id;

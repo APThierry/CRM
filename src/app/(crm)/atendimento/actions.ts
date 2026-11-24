@@ -10,7 +10,8 @@ import { lerDataLocal } from "@/lib/automacao/horario";
 import { buscarConversa, veTodasConversas } from "@/lib/atendimento";
 import { db } from "@/lib/db";
 import { chaveTelefone, normalizarWhatsapp } from "@/lib/formatar";
-import { enviarNaConversa, type ResultadoEnvio } from "@/lib/whatsapp/enviar";
+import { inteiro, lerValor } from "@/lib/validar";
+import { enviarNaConversa, TEXTO_MAXIMO, type ResultadoEnvio } from "@/lib/whatsapp/enviar";
 import { obterConversa } from "@/lib/whatsapp/mensagens";
 
 // Textos de formulário chegam com "\r\n"; o WhatsApp usa só "\n".
@@ -119,10 +120,10 @@ async function ligarAoCliente(conversaId: string, clienteId: string, contatoId: 
 export async function cadastrarClienteDaConversa(conversaId: string, formData: FormData) {
   const { eu, conversa } = await conversaPermitida(conversaId);
   if (conversa.clienteId) throw new Error("Esta conversa já está ligada a um cliente.");
-  const nome = campo(formData, "nome");
+  const nome = campo(formData, "nome").slice(0, 200);
   if (!nome) throw new Error("Informe o nome do cliente.");
   const tipo = campo(formData, "tipo") === "PF" ? "PF" : "PJ";
-  const nomeContato = campo(formData, "contatoNome") || (tipo === "PF" ? nome : conversa.nome) || nome;
+  const nomeContato = campo(formData, "contatoNome").slice(0, 200) || (tipo === "PF" ? nome : conversa.nome) || nome;
   const whatsapp = normalizarWhatsapp(conversa.telefone);
 
   const cliente = await db.cliente.create({
@@ -132,8 +133,8 @@ export async function cadastrarClienteDaConversa(conversaId: string, formData: F
       tipo,
       nome,
       whatsapp,
-      cidade: campo(formData, "cidade") || null,
-      uf: campo(formData, "uf").toUpperCase() || null,
+      cidade: campo(formData, "cidade").slice(0, 200) || null,
+      uf: campo(formData, "uf").slice(0, 2).toUpperCase() || null,
       origem: "WhatsApp",
       contatos: {
         create: { organizacaoId: eu.organizacao.id, nome: nomeContato, whatsapp, principal: true },
@@ -158,7 +159,7 @@ export async function vincularClienteExistente(conversaId: string, formData: For
     data: {
       organizacaoId: eu.organizacao.id,
       clienteId: cliente.id,
-      nome: campo(formData, "contatoNome") || conversa.nome || "Contato do WhatsApp",
+      nome: campo(formData, "contatoNome").slice(0, 200) || conversa.nome || "Contato do WhatsApp",
       whatsapp,
     },
   });
@@ -187,7 +188,7 @@ export async function criarNegocioDaConversa(conversaId: string, formData: FormD
     servicoId ? db.servico.findFirst({ where: { id: servicoId, organizacaoId: org } }) : null,
   ]);
   if (!cliente || !primeiraEtapa) throw new Error("Cliente ou funil não encontrados.");
-  const valor = Number(campo(formData, "valor").replace(/\./g, "").replace(",", ".")) || 0;
+  const valor = lerValor(formData.get("valor"));
 
   const negocio = await db.negocio.create({
     data: {
@@ -199,7 +200,7 @@ export async function criarNegocioDaConversa(conversaId: string, formData: FormD
       etapaId: primeiraEtapa.id,
       responsavelId: eu.id,
       valor,
-      quantidadeAlunos: Number(campo(formData, "quantidadeAlunos")) || null,
+      quantidadeAlunos: inteiro(formData.get("quantidadeAlunos"), 1, 1_000_000),
     },
   });
   await dispararComDados(org, "negocio.criado", () => dadosNegocio(negocio.id));
@@ -215,10 +216,12 @@ export async function agendarNaConversa(conversaId: string, _estado: ResultadoAg
   const texto = campo(formData, "texto");
   const enviarEm = lerDataLocal(campo(formData, "enviarEm"));
   if (!texto) return { erro: "Escreva a mensagem." };
+  if (texto.length > TEXTO_MAXIMO) return { erro: `Mensagem grande demais (máximo ${TEXTO_MAXIMO} caracteres).` };
   if (!enviarEm) return { erro: "Escolha o dia e a hora." };
   if (enviarEm.getTime() < Date.now() - 60_000) return { erro: "Esse horário já passou." };
   if (enviarEm.getTime() > Date.now() + 366 * 86_400_000) return { erro: "Agende para no máximo um ano." };
-  await agendar(eu, conversa, { texto, enviarEm, cancelarSeResponder: formData.get("cancelarSeResponder") === "on" });
+  const r = await agendar(eu, conversa, { texto, enviarEm, cancelarSeResponder: formData.get("cancelarSeResponder") === "on" });
+  if ("erro" in r) return { erro: r.erro };
   refresh();
   return { ok: "Mensagem agendada." };
 }
@@ -227,6 +230,7 @@ export async function iniciarSequenciaNaConversa(conversaId: string, _estado: Re
   const { eu, conversa } = await conversaPermitida(conversaId);
   const sequencia = await iniciar(eu, conversa, campo(formData, "sequenciaId"));
   if (!sequencia) return { erro: "Escolha uma sequência (com pelo menos uma mensagem)." };
+  if ("erro" in sequencia) return { erro: sequencia.erro };
   refresh();
   return { ok: `Sequência "${sequencia.nome}" iniciada.` };
 }
