@@ -5,7 +5,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 const COOKIE_SESSAO = "crm_sessao"; // mesmo nome de src/lib/sessao.ts
-const PUBLICAS = ["/login"];
+// Telas sem login: entrar, criar conta, confirmar e-mail, nova senha e termos (Fase F2).
+const PUBLICAS = ["/login", "/cadastro", "/confirmar", "/senha", "/termos", "/privacidade"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

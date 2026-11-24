@@ -9,6 +9,7 @@ import { Cabecalho, Carregando, Etiqueta } from "@/components/ui";
 import { exigirPapel } from "@/lib/auth";
 import { obterAutomacao } from "@/lib/automacao/config";
 import { estaAberto, paraDataLocal } from "@/lib/automacao/horario";
+import { AVISO_CAMPANHAS_BLOQUEADAS, campanhasLiberadas } from "@/lib/campanhas/liberacao";
 import { montarTexto } from "@/lib/campanhas/motor";
 import { estimarDuracao } from "@/lib/campanhas/ritmo";
 import { db } from "@/lib/db";
@@ -34,6 +35,7 @@ async function Conteudo({ params, searchParams }: { params: PageProps<"/campanha
   const eu = await exigirPapel("ADMIN", "GESTOR");
   const { id } = await params;
   const { preparada } = await searchParams;
+  const liberadas = await campanhasLiberadas(eu.organizacao.id);
   const campanha = await db.campanha.findFirst({
     where: { id, organizacaoId: eu.organizacao.id },
     include: {
@@ -80,6 +82,7 @@ async function Conteudo({ params, searchParams }: { params: PageProps<"/campanha
             a mensagem, mande um teste e clique em Iniciar.
           </p>
         )}
+        {!liberadas && <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">{AVISO_CAMPANHAS_BLOQUEADAS}</p>}
         {simulandoEnvio() && (
           <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
             <strong>Modo simulação ligado:</strong> nada sai para o WhatsApp.
@@ -100,7 +103,7 @@ async function Conteudo({ params, searchParams }: { params: PageProps<"/campanha
           {!estaAberto(config.horarios) && ativa && <span className="text-sm text-slate-500">(fora do horário de atendimento: espera abrir)</span>}
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            {editavel && pendentes > 0 && (
+            {editavel && pendentes > 0 && liberadas && (
               <form action={iniciarCampanha.bind(null, campanha.id)} className="flex flex-wrap items-center gap-2">
                 <label className="text-xs text-slate-500" htmlFor="iniciarEm">Começar em (opcional)</label>
                 <input

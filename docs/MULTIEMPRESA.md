@@ -1,6 +1,6 @@
 # Fase F: várias empresas no mesmo CRM (plano)
 
-> **Status: F1 pronta** (base multiempresa). F2, F3 e F4 ainda são plano. Tudo vem antes da instalação na VPS: é mais fácil mudar agora do que depois, com dados reais lá dentro.
+> **Status: F1 e F2 prontas** (base multiempresa e cadastro público). F3 e F4 ainda são plano. Tudo vem antes da instalação na VPS: é mais fácil mudar agora do que depois, com dados reais lá dentro.
 
 ## O que foi decidido
 
@@ -70,7 +70,7 @@ O script faz 35 verificações:
 
 No fim, apaga o que criou.
 
-### F2. Cadastro público e e-mail
+### F2. Cadastro público e e-mail ✅
 
 - **Página "Criar conta"** (`/cadastro`): nome da empresa, ramo, nome da pessoa, e-mail, senha e aceite dos termos.
 - **Confirmação por e-mail:** a conta só é liberada depois que a pessoa clica no link recebido.
@@ -82,6 +82,57 @@ No fim, apaga o que criou.
   - **campanhas só liberadas depois que você aprovar a empresa** (é o que mais pode dar problema com spam).
 - **Período de teste:** ao acabar, a empresa fica suspensa até você ativar.
 - **Primeiros passos:** depois do cadastro, uma tela guia a pessoa: escolher o ramo, ver o funil sugerido, conectar o WhatsApp e convidar a equipe.
+
+#### Como ficou (F2)
+
+Decisões: o nome do produto vem de `APP_NOME` (padrão "CRM"), o teste dura 14 dias (`CADASTRO_DIAS_TESTE`) e o dono do sistema recebe um e-mail a cada cadastro (`DONO_EMAIL`).
+
+| Tela | Endereço | O que faz |
+| --- | --- | --- |
+| Criar conta | `/cadastro` | Empresa, ramo, nome, WhatsApp (opcional), e-mail, senha e aceite dos termos. Cria a empresa em teste e manda o link de confirmação |
+| Confirmar e-mail | `/confirmar?codigo=...` | Link do e-mail (vale 48 h, uma vez só). A confirmação é um botão, porque alguns programas de e-mail abrem os links sozinhos. Confirma e entra |
+| Esqueci minha senha | `/senha/esqueci` | Manda o link de senha nova. A resposta é sempre a mesma, exista ou não a conta |
+| Senha nova | `/senha/nova?codigo=...` | Link do e-mail (vale 1 h, uma vez só). Troca a senha, desconecta os outros aparelhos e entra |
+| Termos e privacidade | `/termos`, `/privacidade` | **Texto provisório**: precisa ser escrito/revisado por vocês, de preferência com um advogado. Ao trocar o texto, troque `TERMOS_VERSAO` em `src/lib/cadastro.ts` |
+| Primeiros passos | `/primeiros-passos` | Lista que se marca sozinha: WhatsApp, horário e chatbot, equipe, primeiro cliente, primeira mensagem |
+
+Regras:
+
+- **Quem se cadastra sozinho** só entra depois de confirmar o e-mail. Se tentar entrar antes, o CRM manda o link de novo (no máximo um a cada 5 minutos). Quem foi criado pelo administrador, pelo seed ou pelo script já vem confirmado.
+- **Proteção contra robôs:**
+  - campo escondido: quem preenche recebe "deu certo", mas nada é criado;
+  - o formulário não pode ser enviado em menos de 3 segundos;
+  - no máximo 3 cadastros por hora do mesmo IP;
+  - no máximo 10 pedidos de senha nova por hora do mesmo IP, e 1 a cada 5 minutos para o mesmo e-mail.
+- **Campanhas:** empresa cadastrada pela página nasce com `campanhasLiberadas = false`. Ela monta e revisa campanhas, mas não inicia nem manda teste, e o relógio ignora. Para liberar, enquanto o painel do dono (F4) não existe: Prisma Studio, tabela `Organizacao`, coluna `campanhasLiberadas`.
+- **Período de teste:** uma faixa no topo mostra quantos dias faltam. Quando acaba, a empresa fica bloqueada (regra da F1) até você mudar a `situacao` para `ATIVA`.
+- **Nome da empresa:** o menu mostra o nome da empresa de quem está logado (antes era fixo "Brigada MG"). A resposta rápida padrão usa `{empresa}`.
+
+**E-mail na VPS:** preencha `SMTP_HOST`, `SMTP_PORTA`, `SMTP_USUARIO`, `SMTP_SENHA`, `EMAIL_REMETENTE`, `APP_URL` e `DONO_EMAIL` (veja `.env.example`). Para os e-mails não caírem no spam, o serviço escolhido vai pedir para configurar SPF e DKIM no DNS do domínio. No seu computador, sem `SMTP_HOST`, os e-mails aparecem no terminal do `npm run dev`, com o link.
+
+O código está em:
+
+- `src/lib/email.ts`: envio;
+- `src/lib/conta.ts`: links e textos dos e-mails;
+- `src/lib/cadastro.ts`: ramos e versão dos termos;
+- `src/lib/limite.ts`: limite de tentativas;
+- `src/lib/campanhas/liberacao.ts`: liberação das campanhas;
+- `src/app/(publico)/`: as telas.
+
+**Teste** (com o banco local ligado):
+
+```bash
+npx tsx --conditions=react-server scripts/testar-cadastro.mts
+```
+
+O script faz 18 verificações:
+
+- limite de tentativas;
+- e-mail sem HTML injetado;
+- empresa criada pelo cadastro e pelo script;
+- e-mails de confirmação e de aviso ao dono;
+- links: valem uma vez, vencem, um tipo não serve para o outro, pedir outro invalida o anterior;
+- campanhas bloqueadas até aprovar.
 
 ### F3. Módulos por empresa
 

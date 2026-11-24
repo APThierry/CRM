@@ -41,6 +41,8 @@ export async function criarUsuario(_e: Resultado, formData: FormData): Promise<R
       email,
       papel: papelDe(formData.get("papel")),
       senhaHash: await gerarHashSenha(senha),
+      // Criado pelo administrador, que conhece a pessoa: não precisa confirmar o e-mail.
+      emailConfirmadoEm: new Date(),
     },
   });
   refresh();

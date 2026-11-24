@@ -9,6 +9,7 @@ import { obterAutomacao } from "@/lib/automacao/config";
 import { lerDataLocal } from "@/lib/automacao/horario";
 import { montarTexto } from "@/lib/campanhas/motor";
 import { lerFiltro, montarPublico } from "@/lib/campanhas/publico";
+import { AVISO_CAMPANHAS_BLOQUEADAS, campanhasLiberadas } from "@/lib/campanhas/liberacao";
 import { prepararReciclagem } from "@/lib/campanhas/reciclagem";
 import { db } from "@/lib/db";
 import { chaveTelefone, normalizarWhatsapp } from "@/lib/formatar";
@@ -65,6 +66,7 @@ export async function criarCampanha(_estado: Resultado, formData: FormData): Pro
 export async function iniciarCampanha(id: string, formData: FormData) {
   const { campanha } = await minha(id);
   if (!["RASCUNHO", "PAUSADA"].includes(campanha.status)) return;
+  if (!(await campanhasLiberadas(campanha.organizacaoId))) return; // a tela mostra o aviso
   const quando = lerDataLocal(campo(formData, "iniciarEm"));
   await db.campanha.update({
     where: { id },
@@ -121,6 +123,7 @@ export async function salvarTexto(id: string, _estado: Resultado, formData: Form
 /** Manda a mensagem (com uma variação sorteada) para um número de teste, na hora. */
 export async function enviarTeste(id: string, _estado: Resultado, formData: FormData): Promise<Resultado> {
   const { eu, campanha } = await minha(id);
+  if (!(await campanhasLiberadas(campanha.organizacaoId))) return { erro: AVISO_CAMPANHAS_BLOQUEADAS };
   const numero = normalizarWhatsapp(campo(formData, "numero"));
   if (!chaveTelefone(numero)) return { erro: "Digite o número com DDD, ex.: (31) 99999-9999." };
   const exemplo = await db.destinatarioCampanha.findFirst({ where: { campanhaId: id }, orderBy: { ordem: "asc" } });

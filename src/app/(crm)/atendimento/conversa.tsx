@@ -128,7 +128,7 @@ export async function PainelConversa({ eu, conversaId, filtros }: { eu: UsuarioA
         conversaId={conversa.id}
         respostas={respostas.map((r) => ({
           atalho: r.atalho,
-          texto: preencherVariaveis(r.texto, { nome: nomeParaResposta, atendente: eu.nome }),
+          texto: preencherVariaveis(r.texto, { nome: nomeParaResposta, atendente: eu.nome, empresa: eu.organizacao.nome }),
         }))}
       />
     </div>

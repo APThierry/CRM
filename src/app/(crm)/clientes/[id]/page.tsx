@@ -179,6 +179,7 @@ async function FichaCliente({ params }: { params: PageProps<"/clientes/[id]">["p
           <section id="whatsapp" className="cartao p-4 text-sm">
             <h2 className="mb-3 font-semibold">💬 WhatsApp</h2>
             <ConversaWhatsapp
+              empresa={org.nome}
               clienteId={cliente.id}
               conectado={whatsapp.estado === "open"}
               numeros={[...numeros].map(([valor, rotulo]) => ({ valor, rotulo }))}

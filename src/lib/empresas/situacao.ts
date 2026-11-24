@@ -29,3 +29,8 @@ export function ondeLiberada(agora = new Date()): Prisma.OrganizacaoWhereInput {
     OR: [{ situacao: "ATIVA" }, { situacao: "EM_TESTE", OR: [{ testeAte: null }, { testeAte: { gt: agora } }] }],
   };
 }
+
+/** Dias que faltam para o fim do teste (0 = termina hoje). */
+export function diasRestantes(fim: Date, agora = new Date()) {
+  return Math.max(0, Math.ceil((fim.getTime() - agora.getTime()) / 86_400_000));
+}

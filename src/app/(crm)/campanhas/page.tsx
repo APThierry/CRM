@@ -6,6 +6,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { Cabecalho, Carregando, Etiqueta, Vazio } from "@/components/ui";
 import { exigirPapel } from "@/lib/auth";
+import { AVISO_CAMPANHAS_BLOQUEADAS, campanhasLiberadas } from "@/lib/campanhas/liberacao";
 import { obterAutomacao } from "@/lib/automacao/config";
 import { enviadasHoje } from "@/lib/campanhas/motor";
 import { descreverCursos, listarReciclagens } from "@/lib/campanhas/reciclagem";
@@ -63,6 +64,9 @@ async function Conteudo({ searchParams }: { searchParams: PageProps<"/campanhas"
 
   return (
     <div className="space-y-6">
+      {!(await campanhasLiberadas(org)) && (
+        <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">{AVISO_CAMPANHAS_BLOQUEADAS}</p>
+      )}
       {simulandoEnvio() && (
         <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           <strong>Modo simulação ligado</strong> (WHATSAPP_SIMULAR_ENVIO=1): as campanhas registram as mensagens no CRM, mas nada sai para o WhatsApp.

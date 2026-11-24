@@ -52,3 +52,9 @@ export async function ContadorAtendimento() {
     </span>
   );
 }
+
+/** Nome da empresa no topo do menu. */
+export async function NomeEmpresa() {
+  await connection();
+  return (await getUsuarioAtual()).organizacao.nome;
+}

@@ -54,7 +54,7 @@ export async function processarCampanhas(agora = new Date()) {
 
   // Agendadas que chegaram na hora viram "enviando" (se não houver outra enviando na organização).
   const agendadas = await db.campanha.findMany({
-    where: { status: "AGENDADA", OR: [{ iniciarEm: null }, { iniciarEm: { lte: agora } }], organizacao: ondeLiberada(agora) },
+    where: { status: "AGENDADA", OR: [{ iniciarEm: null }, { iniciarEm: { lte: agora } }], organizacao: { ...ondeLiberada(agora), campanhasLiberadas: true } },
     orderBy: [{ iniciarEm: "asc" }, { criadoEm: "asc" }],
   });
   for (const c of agendadas) {
@@ -68,7 +68,7 @@ export async function processarCampanhas(agora = new Date()) {
 
   const ativas = await db.campanha.findMany({
     // Empresa suspensa ou com o teste vencido: a campanha fica parada onde está.
-    where: { status: "ENVIANDO", organizacao: ondeLiberada(agora) },
+    where: { status: "ENVIANDO", organizacao: { ...ondeLiberada(agora), campanhasLiberadas: true } },
     include: { organizacao: { select: { nome: true } } },
   });
   let enviadas = 0;

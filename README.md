@@ -51,7 +51,7 @@ npm run dev           # abre em http://localhost:3000
 
 Na primeira vez, abra http://localhost:3000. Numa instalação nova (uma empresa só, a do seed, e ninguém com senha), o CRM mostra **Primeiro acesso**: crie o administrador (nome, e-mail e senha). Depois, em **Usuários**, cadastre a equipe.
 
-Outras empresas entram pelo script abaixo, até a página de cadastro ficar pronta (veja [docs/MULTIEMPRESA.md](docs/MULTIEMPRESA.md)):
+Outras empresas se cadastram sozinhas em `/cadastro` (link **Criar conta grátis** na tela de entrada), com 14 dias de teste e confirmação por e-mail. Você também pode criar uma pelo terminal (veja [docs/MULTIEMPRESA.md](docs/MULTIEMPRESA.md)):
 
 ```bash
 npx tsx --conditions=react-server scripts/criar-empresa.mts "Nome da empresa" "Nome do admin" email@empresa.com 14

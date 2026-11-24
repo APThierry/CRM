@@ -2,7 +2,9 @@
 // Entrar, sair e primeiro acesso.
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { enviarConfirmacao } from "@/lib/conta";
 import { motivoBloqueio } from "@/lib/empresas/situacao";
+import { dentroDoLimite } from "@/lib/limite";
 import { conferirSenha, gerarHashSenha, temSenha, validarSenhaNova } from "@/lib/senha";
 import { criarSessao, encerrarSessao } from "@/lib/sessao";
 
@@ -31,7 +33,7 @@ export async function entrar(_estado: EstadoFormulario, formData: FormData): Pro
     return { erro: `Muitas tentativas. Tente de novo em ${minutos} min.`, valores };
   }
 
-  const usuario = await db.usuario.findUnique({ where: { email }, include: { organizacao: { select: { situacao: true, testeAte: true } } } });
+  const usuario = await db.usuario.findUnique({ where: { email }, include: { organizacao: { select: { nome: true, situacao: true, testeAte: true } } } });
   const ok = usuario?.ativo && (await conferirSenha(senha, usuario.senhaHash));
   if (!usuario || !ok) {
     const erros = (registro && registro.ate > Date.now() ? registro.erros : 0) + 1;
@@ -41,6 +43,14 @@ export async function entrar(_estado: EstadoFormulario, formData: FormData): Pro
   }
 
   tentativas.delete(email);
+  // Cadastro público (F2): só entra depois de clicar no link do e-mail. Mandamos o link de novo
+  // (no máximo um a cada 5 minutos), porque o primeiro pode ter ido para o spam ou vencido.
+  if (!usuario.emailConfirmadoEm) {
+    if (dentroDoLimite(`confirmacao:${email}`, 1, 5 * 60_000)) {
+      await enviarConfirmacao(usuario, usuario.organizacao.nome).catch((e) => console.error("[login] não consegui reenviar a confirmação:", e));
+    }
+    return { erro: `Falta confirmar o seu e-mail. Enviamos um link para ${email} (olhe também o spam).`, valores };
+  }
   // Empresa suspensa ou com o teste vencido (Fase F): a senha está certa, mas não entra.
   const bloqueio = motivoBloqueio(usuario.organizacao);
   if (bloqueio) return { erro: bloqueio, valores };
@@ -88,8 +98,8 @@ export async function configurarPrimeiroAcesso(_estado: EstadoFormulario, formDa
 
   const senhaHash = await gerarHashSenha(senha);
   const usuario = existente
-    ? await db.usuario.update({ where: { id: existente.id }, data: { nome, senhaHash, papel: "ADMIN", ativo: true } })
-    : await db.usuario.create({ data: { organizacaoId: org.id, nome, email, senhaHash, papel: "ADMIN" } });
+    ? await db.usuario.update({ where: { id: existente.id }, data: { nome, senhaHash, papel: "ADMIN", ativo: true, emailConfirmadoEm: new Date() } })
+    : await db.usuario.create({ data: { organizacaoId: org.id, nome, email, senhaHash, papel: "ADMIN", emailConfirmadoEm: new Date() } });
 
   await criarSessao(usuario.id);
   redirect("/");

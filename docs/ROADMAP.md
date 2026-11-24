@@ -35,7 +35,7 @@
 - [x] Assinatura do atendente no WhatsApp (*Nome:*) e autor de mensagens e atividades
 - [x] Filtro por organização em todas as consultas (pela organização do usuário logado)
 - [ ] Restrições finas por papel (vendedor ver só os próprios clientes, instrutor só turmas)
-- [ ] "Esqueci minha senha" por e-mail
+- [x] "Esqueci minha senha" por e-mail (Fase F2)
 
 ## Fase 3: WhatsApp
 - [x] Decidir o provedor: Evolution API (usa o Baileys por dentro)
@@ -109,6 +109,6 @@
   - [ ] Google Agenda com escrita (OAuth), se o link de assinatura não bastar
 - [ ] Fase F: Várias empresas no mesmo CRM (plano em docs/MULTIEMPRESA.md)
   - [x] F1. Base: situação da empresa (teste, ativa, suspensa), um WhatsApp por empresa, empresa nova já com funil, teste de isolamento (scripts/testar-multiempresa.mts)
-  - [ ] F2. Cadastro público com confirmação por e-mail, "esqueci minha senha", proteção contra abuso e período de teste
+  - [x] F2. Cadastro público com confirmação por e-mail, "esqueci minha senha", proteção contra abuso, período de teste, campanhas só depois da aprovação e primeiros passos (scripts/testar-cadastro.mts)
   - [ ] F3. Módulos por empresa: turmas e certificados opcionais, "Produtos e serviços", funil sugerido por ramo
   - [ ] F4. Painel do dono do sistema: empresas, uso, suspender, ativar, liberar campanhas

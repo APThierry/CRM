@@ -81,7 +81,7 @@ export function montarIcs(nome: string, eventos: EventoAgenda[], agora = new Dat
   const linhas = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//CRM Brigada//Agenda//PT-BR",
+    "PRODID:-//CRM//Agenda//PT-BR",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     `X-WR-CALNAME:${esc(nome)}`,

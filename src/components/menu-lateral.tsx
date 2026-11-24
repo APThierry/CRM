@@ -29,14 +29,15 @@ const itens = [
 
 // `usuario` e `contador` chegam prontos do servidor (Server Components dentro de Suspense).
 // `contador` é o número de conversas com mensagens não lidas, ao lado de "Atendimento".
-export function MenuLateral({ usuario, contador }: { usuario?: React.ReactNode; contador?: React.ReactNode }) {
+export function MenuLateral({ empresa, app, usuario, contador }: { empresa?: React.ReactNode; app: string; usuario?: React.ReactNode; contador?: React.ReactNode }) {
   const [aberto, setAberto] = useState(false);
   return (
     <aside className="sticky top-0 z-30 flex shrink-0 flex-col bg-marca-900 text-marca-50 print:hidden! md:h-screen md:w-56">
       <div className="flex items-center justify-between px-5 py-3 md:py-5">
         <div>
-          <div className="text-lg font-bold tracking-tight">Brigada MG</div>
-          <div className="text-xs text-marca-100/70">CRM</div>
+          {/* Nome da empresa de quem está logado (cada empresa vê o seu). */}
+          <div className="max-w-40 truncate text-lg font-bold tracking-tight">{empresa}</div>
+          <div className="text-xs text-marca-100/70">{app}</div>
         </div>
         <button
           type="button"

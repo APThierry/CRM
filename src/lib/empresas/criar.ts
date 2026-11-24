@@ -1,6 +1,6 @@
 import "server-only";
 // Cria uma empresa nova com o primeiro administrador (Fase F).
-// Hoje é usado pelo script scripts/criar-empresa.mts; na F2, pela página de cadastro.
+// Usado pela página de cadastro (src/app/(publico)/cadastro) e pelo script scripts/criar-empresa.mts.
 import { db } from "@/lib/db";
 import { gerarHashSenha, validarSenhaNova } from "@/lib/senha";
 import { prepararEmpresa, slugLivre } from "./preparar";
@@ -12,6 +12,12 @@ export type NovaEmpresa = {
   diasTeste?: number;
   documento?: string | null;
   telefone?: string | null;
+  ramo?: string | null;
+  /**
+   * Cadastro público (F2): o administrador só entra depois de confirmar o e-mail,
+   * a empresa só dispara campanhas depois que o dono aprova, e guardamos o aceite dos termos.
+   */
+  cadastroPublico?: { termosVersao: string };
 };
 
 export class ErroCadastro extends Error {}
@@ -39,12 +45,18 @@ export async function criarEmpresa(dados: NovaEmpresa, agora = new Date()) {
         documento: dados.documento || null,
         telefone: dados.telefone || null,
         email,
+        ramo: dados.ramo || null,
         situacao: dados.diasTeste ? "EM_TESTE" : "ATIVA",
+        campanhasLiberadas: !dados.cadastroPublico,
+        termosAceitosEm: dados.cadastroPublico ? agora : null,
+        termosVersao: dados.cadastroPublico?.termosVersao ?? null,
         testeAte: dados.diasTeste ? new Date(agora.getTime() + dados.diasTeste * 86_400_000) : null,
       },
     });
     await prepararEmpresa(tx, org);
-    const admin = await tx.usuario.create({ data: { organizacaoId: org.id, nome: nomeAdmin, email, senhaHash, papel: "ADMIN" } });
+    const admin = await tx.usuario.create({
+      data: { organizacaoId: org.id, nome: nomeAdmin, email, senhaHash, papel: "ADMIN", emailConfirmadoEm: dados.cadastroPublico ? null : agora },
+    });
     return { org, admin };
   });
 }

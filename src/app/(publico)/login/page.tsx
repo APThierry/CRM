@@ -1,8 +1,10 @@
-// Tela de entrada. Se ninguém tem senha ainda, mostra o "primeiro acesso".
+// Tela de entrada. Numa instalação nova (ninguém tem senha), mostra o "primeiro acesso".
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { cadastroAberto } from "@/lib/cadastro";
 import { lerSessao } from "@/lib/sessao";
 import { primeiroAcessoLiberado } from "./actions";
 import { FormularioLogin, FormularioPrimeiroAcesso } from "./formularios";
@@ -11,17 +13,9 @@ export const metadata: Metadata = { title: "Entrar" };
 
 export default function PaginaLogin() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-marca-900 px-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-xl">
-        <div className="mb-6 text-center">
-          <div className="text-2xl font-bold tracking-tight text-marca-700">Brigada MG</div>
-          <div className="text-sm text-slate-500">CRM</div>
-        </div>
-        <Suspense fallback={<div className="h-48" />}>
-          <Conteudo />
-        </Suspense>
-      </div>
-    </div>
+    <Suspense fallback={<div className="h-48" />}>
+      <Conteudo />
+    </Suspense>
   );
 }
 
@@ -43,7 +37,16 @@ async function Conteudo() {
     <>
       <h1 className="mb-4 text-lg font-semibold">Entrar</h1>
       <FormularioLogin />
-      <p className="mt-4 text-center text-xs text-slate-500">Esqueceu a senha? Peça ao administrador para redefinir.</p>
+      <div className="mt-4 space-y-2 text-center text-sm">
+        <p>
+          <Link href="/senha/esqueci" className="text-marca-700 hover:underline">Esqueci minha senha</Link>
+        </p>
+        {cadastroAberto() && (
+          <p className="text-slate-500">
+            Ainda não tem conta? <Link href="/cadastro" className="font-medium text-marca-700 hover:underline">Criar conta grátis</Link>
+          </p>
+        )}
+      </div>
     </>
   );
 }

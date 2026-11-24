@@ -13,7 +13,7 @@ export const ETIQUETAS_PADRAO = [
 export const RESPOSTAS_PADRAO = [
   {
     atalho: "ola",
-    texto: "Olá {primeiro_nome}! Aqui é {atendente}, da Brigada MG. Como posso ajudar?",
+    texto: "Olá {primeiro_nome}! Aqui é {atendente}, da {empresa}. Como posso ajudar?",
   },
   {
     atalho: "orcamento",

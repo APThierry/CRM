@@ -14,18 +14,20 @@ export type MensagemTela = {
   autor: string | null; // atendente que enviou pelo CRM
 };
 
-const modelos = [
-  "Olá! Tudo bem? Aqui é da Brigada MG.",
+const modelosPara = (empresa: string) => [
+  `Olá! Tudo bem? Aqui é da ${empresa}.`,
   "Olá! Segue a proposta do treinamento conforme conversamos.",
   "Olá! Os certificados da sua equipe estão próximos do vencimento. Vamos agendar a reciclagem?",
 ];
 
 export function ConversaWhatsapp({
+  empresa,
   clienteId,
   mensagens,
   numeros,
   conectado,
 }: {
+  empresa: string;
   clienteId: string;
   mensagens: MensagemTela[];
   numeros: { valor: string; rotulo: string }[];
@@ -97,7 +99,7 @@ export function ConversaWhatsapp({
               }}
             >
               <option value="">Usar um modelo…</option>
-              {modelos.map((m) => <option key={m} value={m}>{m.slice(0, 50)}…</option>)}
+              {modelosPara(empresa).map((m) => <option key={m} value={m}>{m.slice(0, 50)}…</option>)}
             </select>
           </div>
           <div className="flex gap-2">

@@ -32,6 +32,11 @@ model Organizacao {
   // Fase F: várias empresas. Em teste até `testeAte`; suspensa = ninguém entra e a automação para.
   situacao  SituacaoEmpresa @default(ATIVA)
   testeAte  DateTime?
+  // Fase F2: cadastro público.
+  ramo                String? // ex.: "Treinamento e segurança do trabalho"
+  campanhasLiberadas  Boolean   @default(true) // quem se cadastra sozinho só dispara campanhas depois que o dono aprova
+  termosAceitosEm     DateTime?
+  termosVersao        String?
 
   usuarios      Usuario[]
   clientes      Cliente[]
@@ -81,6 +86,8 @@ model Usuario {
   assinaturaWhatsapp Boolean   @default(true)
   // Link da agenda (.ics) para assinar no Google Agenda. Guardamos só o hash do código.
   agendaTokenHash    String?   @unique
+  // Fase F2: quem se cadastra sozinho só entra depois de clicar no link do e-mail.
+  emailConfirmadoEm  DateTime?
   ultimoAcesso       DateTime?
   criadoEm           DateTime  @default(now())
 
@@ -90,6 +97,7 @@ model Usuario {
   atividades          Atividade[]
   turmasComoInstrutor Turma[]
   sessoes             Sessao[]
+  codigosEmail        CodigoEmail[]
   mensagens           MensagemWhatsapp[]
   conversas           Conversa[]
   respostas           RespostaRapida[]
@@ -102,6 +110,26 @@ model Usuario {
 
 // Sessão de login. O navegador guarda só um código aleatório (cookie);
 // aqui fica o "hash" desse código, então quem vê o banco não consegue entrar.
+enum TipoCodigoEmail {
+  CONFIRMAR_EMAIL
+  NOVA_SENHA
+}
+
+/** Links enviados por e-mail (confirmar cadastro, criar nova senha). Guardamos só o hash. */
+model CodigoEmail {
+  id        String          @id @default(cuid())
+  usuarioId String
+  tipo      TipoCodigoEmail
+  tokenHash String          @unique
+  expiraEm  DateTime
+  usadoEm   DateTime?
+  criadoEm  DateTime        @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, tipo])
+}
+
 model Sessao {
   id        String   @id @default(cuid())
   usuarioId String

@@ -46,7 +46,7 @@ async function main() {
       { nome: "Administrador", email: "admin@brigadamg.local", papel: "ADMIN" as const },
       { nome: "Ana (Comercial)", email: "comercial@brigadamg.local", papel: "VENDEDOR" as const },
       { nome: "Carlos (Instrutor)", email: "instrutor@brigadamg.local", papel: "INSTRUTOR" as const },
-    ].map((u) => db.usuario.create({ data: { ...u, organizacaoId, senhaHash: "definir-na-fase-2" } })),
+    ].map((u) => db.usuario.create({ data: { ...u, organizacaoId, senhaHash: "definir-na-fase-2", emailConfirmadoEm: new Date() } })),
   );
 
   // Etapas do funil de vendas.
